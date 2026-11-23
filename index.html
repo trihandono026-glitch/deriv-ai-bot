@@ -1,0 +1,527 @@
+
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="theme-color" content="#101827">
+<title>Deriv AI Bot</title>
+<style>
+*{box-sizing:border-box}
+body{margin:0;background:#0b1220;color:#eef4ff;font:14px Arial,sans-serif}
+main{max-width:750px;margin:auto;padding:16px}
+h2{margin:0;font-size:22px}
+.panel{background:#142033;border:1px solid #293950;
+border-radius:13px;padding:15px;margin:13px 0}
+.muted{color:#9aabc2;font-size:12px}
+.row{display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:9px}
+button,select{padding:12px;border-radius:9px;border:1px solid #34455c;
+background:#0d1726;color:white;width:100%;margin-top:7px}
+button{background:#1762a6;border:0;font-weight:bold}
+button:disabled{opacity:.4}
+.green{color:#27d69a}.red{color:#ff6c7d}
+#price{font-size:30px;font-weight:bold;margin:14px 0}
+#chart{width:100%;height:210px;background:#0d1726;border-radius:8px}
+#log{white-space:pre-wrap;max-height:180px;overflow:auto;
+font-size:11px;color:#b5c8df}
+.pill{border:1px solid #40516b;padding:6px 10px;border-radius:20px;font-size:12px}
+footer{color:#879ab4;font-size:11px;line-height:1.6}
+</style>
+</head>
+<body>
+<main>
+
+<div class="row">
+ <div>
+  <h2>DERIV AI BOT</h2>
+  <div class="muted">REALTIME MARKET ANALYZER</div>
+ </div>
+ <span class="pill">DEMO DATA</span>
+</div>
+
+<div class="panel">
+ <div class="row">
+  <b>Koneksi Deriv</b>
+  <span id="status" class="pill red">OFFLINE</span>
+ </div>
+ <p class="muted" id="message">Belum terhubung.</p>
+ <div class="grid">
+  <button id="connect">HUBUNGKAN</button>
+  <button id="disconnect" disabled>PUTUSKAN</button>
+ </div>
+</div>
+
+<div class="panel">
+ <b>PILIH PASAR</b>
+ <select id="market">
+  <option value="all">Semua pasar</option>
+  <option value="synthetic">Synthetic Indices</option>
+  <option value="forex">Forex</option>
+ </select>
+
+ <b style="display:block;margin-top:14px">INSTRUMEN</b>
+ <select id="symbol" disabled>
+  <option value="">Hubungkan dahulu</option>
+ </select>
+
+ <b style="display:block;margin-top:14px">TIMEFRAME</b>
+ <select id="tf">
+  <option value="60">M1</option>
+  <option value="300">M5</option>
+  <option value="900">M15</option>
+ </select>
+
+ <div class="grid">
+  <button id="candles" disabled>AMBIL CANDLE</button>
+  <button id="live" disabled>MULAI LIVE</button>
+ </div>
+ <button id="contracts" class="secondary" disabled>CEK JENIS KONTRAK</button>
+</div>
+
+<div class="panel">
+ <div class="row">
+  <b>HARGA REALTIME</b>
+  <span id="selected" class="muted">Belum dipilih</span>
+ </div>
+ <div id="price">—</div>
+ <div id="ticktime" class="muted">Menunggu harga...</div>
+</div>
+
+<div class="panel">
+ <div class="row">
+  <b>GRAFIK CANDLE</b>
+  <span id="count" class="muted">0 candle</span>
+ </div>
+ <canvas id="chart" width="700" height="240"></canvas>
+ <p id="candleinfo" class="muted">Belum ada data candle.</p>
+</div>
+
+<div class="panel">
+ <b>JENIS KONTRAK TERSEDIA</b>
+ <div id="contractinfo" class="muted" style="margin-top:10px">
+ Belum diperiksa.
+ </div>
+</div>
+
+<div class="panel">
+ <b>INFORMASI PASAR</b>
+ <p class="muted" id="marketinfo">Belum ada data.</p>
+ <div class="grid">
+  <div>
+   <div class="muted">Total instrumen</div>
+   <b id="total">0</b>
+  </div>
+  <div>
+   <div class="muted">Koneksi</div>
+   <b id="connectinfo">OFFLINE</b>
+  </div>
+ </div>
+</div>
+
+<div class="panel">
+ <div class="row">
+  <b>LOG SISTEM</b>
+  <button id="clear" style="width:auto">BERSIHKAN</button>
+ </div>
+ <div id="log">DERIV AI BOT SIAP.</div>
+</div>
+
+<footer>
+Tahap 1 hanya membaca data publik Deriv.
+Belum ada transaksi atau akses saldo akun.
+Jangan memasukkan password maupun token akun di halaman ini.
+</footer>
+
+</main>
+
+<script>
+"use strict";
+
+const ENDPOINT =
+"wss://api.derivws.com/trading/v1/options/ws/public";
+
+const $ = id => document.getElementById(id);
+
+let socket = null;
+let requestId = 0;
+let symbols = [];
+let candleData = [];
+let tickSubscription = null;
+let pending = new Map();
+
+function log(text){
+ const time = new Date().toLocaleTimeString("id-ID");
+ $("log").textContent =
+ `[${time}] ${text}\n` + $("log").textContent;
+}
+
+function status(online,text){
+ $("status").textContent = online ? "ONLINE" : "OFFLINE";
+ $("status").className = "pill " + (online ? "green" : "red");
+ $("message").textContent = text;
+ $("connect").disabled = online;
+ $("disconnect").disabled = !online;
+ $("connectinfo").textContent = online ? "ONLINE" : "OFFLINE";
+}
+
+function send(data){
+ return new Promise((resolve,reject)=>{
+  if(!socket || socket.readyState !== WebSocket.OPEN){
+   reject(new Error("Koneksi belum aktif"));
+   return;
+  }
+
+  const id = ++requestId;
+  data.req_id = id;
+  pending.set(id,{resolve,reject});
+  socket.send(JSON.stringify(data));
+
+  setTimeout(()=>{
+   if(pending.has(id)){
+    pending.delete(id);
+    reject(new Error("Server tidak merespons"));
+   }
+  },12000);
+ });
+}
+
+function marketType(s){
+ const v = [
+  s.market,
+  s.market_display_name,
+  s.submarket,
+  s.submarket_display_name,
+  s.display_name,
+  s.symbol
+ ].join(" ").toLowerCase();
+
+ if(/forex/.test(v)) return "forex";
+
+ if(/synthetic|derived|volatility|boom|crash|step|jump|drift|range.?break/.test(v))
+  return "synthetic";
+
+ return "other";
+}
+
+function filtered(){
+ const type = $("market").value;
+ return symbols.filter(s=>
+  type==="all" || marketType(s)===type
+ );
+}
+
+function renderSymbols(){
+ const list = filtered();
+ const select = $("symbol");
+
+ select.innerHTML = "";
+
+ if(!list.length){
+  select.add(new Option("Instrumen tidak ditemukan",""));
+  select.disabled = true;
+  $("candles").disabled = true;
+  $("live").disabled = true;
+  $("contracts").disabled = true;
+  return;
+ }
+
+ list.sort((a,b)=>
+  (a.display_name || a.symbol).localeCompare(
+   b.display_name || b.symbol
+  )
+ );
+
+ list.forEach(s=>{
+  select.add(new Option(
+   `${s.display_name || s.symbol} (${s.symbol})`,
+   s.symbol
+  ));
+ });
+
+ select.disabled = false;
+ $("candles").disabled = false;
+ $("live").disabled = false;
+ $("contracts").disabled = false;
+
+ $("total").textContent = symbols.length;
+
+ const forex = symbols.filter(s=>marketType(s)==="forex").length;
+ const synthetic = symbols.filter(s=>marketType(s)==="synthetic").length;
+
+ $("marketinfo").textContent =
+ `Forex: ${forex} instrumen | Synthetic: ${synthetic} instrumen`;
+
+ updateSelected();
+}
+
+function updateSelected(){
+ const s = symbols.find(x=>x.symbol===$("symbol").value);
+ $("selected").textContent = s ?
+  (s.display_name || s.symbol) : "Belum dipilih";
+}
+
+function connect(){
+ if(socket && socket.readyState===WebSocket.OPEN) return;
+
+ status(false,"Menghubungkan ke Deriv...");
+ log("Membuka WebSocket Deriv.");
+
+ socket = new WebSocket(ENDPOINT);
+
+ socket.onopen = async ()=>{
+  log("WebSocket berhasil tersambung.");
+  status(true,"Mengambil daftar instrumen...");
+  try{
+   const r = await send({active_symbols:"full"});
+
+   if(r.error) throw new Error(r.error.message);
+
+   symbols = r.active_symbols || [];
+
+   if(!symbols.length) throw new Error("Daftar instrumen kosong");
+
+   renderSymbols();
+
+   log(`${symbols.length} instrumen berhasil dimuat.`);
+   status(true,"Koneksi Deriv berhasil.");
+  }catch(e){
+   log("Gagal mengambil instrumen: "+e.message);
+   $("message").textContent = e.message;
+  }
+ };
+
+ socket.onmessage = event=>{
+  let data;
+  try{
+   data = JSON.parse(event.data);
+  }catch(e){return;}
+
+  if(data.req_id && pending.has(data.req_id)){
+   const p = pending.get(data.req_id);
+   pending.delete(data.req_id);
+   p.resolve(data);
+  }
+
+  if(data.error){
+   log("API ERROR: "+data.error.message);
+   return;
+  }
+
+  if(data.msg_type==="tick" && data.tick){
+   const t = data.tick;
+   $("price").textContent =
+    Number(t.quote).toLocaleString("en-US",
+    {maximumFractionDigits:8});
+
+   $("ticktime").textContent =
+    "Waktu server: "+
+    new Date(t.epoch*1000).toLocaleString("id-ID");
+  }
+ };
+
+ socket.onerror = ()=>{
+  log("Kesalahan koneksi WebSocket.");
+ };
+
+ socket.onclose = ()=>{
+  log("Koneksi ditutup.");
+  socket = null;
+  tickSubscription = null;
+
+  pending.forEach(p=>p.reject(new Error("Koneksi ditutup")));
+  pending.clear();
+
+  status(false,"Koneksi terputus.");
+ };
+}
+
+function disconnect(){
+ if(socket) socket.close();
+}
+
+async function loadCandles(){
+ const symbol = $("symbol").value;
+ if(!symbol) return;
+
+ $("candleinfo").textContent = "Mengambil data candle...";
+
+ try{
+  const r = await send({
+   ticks_history:symbol,
+   count:100,
+   end:"latest",
+   style:"candles",
+   granularity:Number($("tf").value)
+  });
+
+  if(r.error) throw new Error(r.error.message);
+
+  candleData = r.candles || [];
+
+  drawChart();
+
+  $("count").textContent = candleData.length+" candle";
+  $("candleinfo").textContent =
+   "Data candle diterima dari Deriv.";
+
+  log(`${candleData.length} candle diterima: ${symbol}`);
+ }catch(e){
+  $("candleinfo").textContent = e.message;
+  log("Candle error: "+e.message);
+ }
+}
+
+function drawChart(){
+ const c = $("chart");
+ const ctx = c.getContext("2d");
+ const w=c.width,h=c.height;
+
+ ctx.clearRect(0,0,w,h);
+ ctx.fillStyle="#0d1726";
+ ctx.fillRect(0,0,w,h);
+
+ if(!candleData.length){
+  ctx.fillStyle="#9aabc2";
+  ctx.fillText("Belum ada data candle",20,30);
+  return;
+ }
+
+ const values = candleData.flatMap(x=>[
+  Number(x.high),Number(x.low)
+ ]);
+
+ let min=Math.min(...values);
+ let max=Math.max(...values);
+
+ if(max===min){max++;min--;}
+
+ const pad=18;
+ const usableH=h-pad*2;
+ const usableW=w-pad*2;
+
+ const y=v=>pad+(max-v)/(max-min)*usableH;
+ const step=usableW/candleData.length;
+ const body=Math.max(2,step*.55);
+
+ ctx.strokeStyle="#26364d";
+
+ for(let i=0;i<5;i++){
+  const yy=pad+i*usableH/4;
+  ctx.beginPath();
+  ctx.moveTo(pad,yy);
+  ctx.lineTo(w-pad,yy);
+  ctx.stroke();
+ }
+
+ candleData.forEach((x,i)=>{
+  const xx=pad+i*step+step/2;
+  const o=Number(x.open);
+  const cl=Number(x.close);
+  const hi=Number(x.high);
+  const lo=Number(x.low);
+
+  const color=cl>=o ? "#22c58b" : "#ff647c";
+
+  ctx.strokeStyle=color;
+  ctx.fillStyle=color;
+
+  ctx.beginPath();
+  ctx.moveTo(xx,y(hi));
+  ctx.lineTo(xx,y(lo));
+  ctx.stroke();
+
+  const top=Math.min(y(o),y(cl));
+  const height=Math.max(2,Math.abs(y(o)-y(cl)));
+
+  ctx.fillRect(xx-body/2,top,body,height);
+ });
+}
+
+async function startLive(){
+ const symbol=$("symbol").value;
+ if(!symbol) return;
+
+ try{
+  if(tickSubscription){
+   await send({forget:tickSubscription}).catch(()=>{});
+   tickSubscription=null;
+  }
+
+  const r=await send({
+   ticks:symbol,
+   subscribe:1
+  });
+
+  if(r.error) throw new Error(r.error.message);
+
+  tickSubscription=r.subscription?.id || null;
+
+  log("Harga realtime aktif: "+symbol);
+ }catch(e){
+  log("Live error: "+e.message);
+ }
+}
+
+async function checkContracts(){
+ const symbol=$("symbol").value;
+ if(!symbol)return;
+
+ $("contractinfo").textContent="Memeriksa kontrak...";
+
+ try{
+  const r=await send({contracts_for:symbol});
+
+  if(r.error)throw new Error(r.error.message);
+
+  const list=r.contracts_for?.available || [];
+
+  if(!list.length){
+   $("contractinfo").textContent=
+    "Tidak ada kontrak yang dikembalikan server.";
+   return;
+  }
+
+  const types=list.map(x=>x.contract_type).filter(Boolean);
+  const wanted=["CALL","PUT","MULTUP","MULTDOWN"];
+
+  $("contractinfo").innerHTML =
+   "<b>Kontrak yang ditemukan:</b><br>" +
+   [...new Set(types)].map(x=>{
+    const supported=wanted.includes(x);
+    return `<div style="margin-top:6px" class="${supported?"green":"muted"}">${x} ${supported?"✓":" "}</div>`;
+   }).join("");
+
+  log("Pemeriksaan kontrak selesai: "+symbol);
+ }catch(e){
+  $("contractinfo").textContent=e.message;
+  log("Kontrak error: "+e.message);
+ }
+}
+
+$("connect").onclick=connect;
+$("disconnect").onclick=disconnect;
+$("market").onchange=renderSymbols;
+$("symbol").onchange=()=>{
+ updateSelected();
+ candleData=[];
+ drawChart();
+ $("price").textContent="—";
+ $("contractinfo").textContent="Belum diperiksa.";
+};
+$("candles").onclick=loadCandles;
+$("live").onclick=startLive;
+$("contracts").onclick=checkContracts;
+
+$("tf").onchange=()=>{
+ if(socket && socket.readyState===WebSocket.OPEN)loadCandles();
+};
+
+$("clear").onclick=()=>{
+ $("log").textContent="Log dibersihkan.";
+};
+
+drawChart();
+</script>
+</body>
+</html>
