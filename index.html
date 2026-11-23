@@ -3,525 +3,575 @@
 <html lang="id">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
-<meta name="theme-color" content="#101827">
-<title>Deriv AI Bot</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>DERIV AI BOT</title>
 <style>
 *{box-sizing:border-box}
-body{margin:0;background:#0b1220;color:#eef4ff;font:14px Arial,sans-serif}
-main{max-width:750px;margin:auto;padding:16px}
-h2{margin:0;font-size:22px}
-.panel{background:#142033;border:1px solid #293950;
-border-radius:13px;padding:15px;margin:13px 0}
-.muted{color:#9aabc2;font-size:12px}
-.row{display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap}
-.grid{display:grid;grid-template-columns:1fr 1fr;gap:9px}
-button,select{padding:12px;border-radius:9px;border:1px solid #34455c;
-background:#0d1726;color:white;width:100%;margin-top:7px}
-button{background:#1762a6;border:0;font-weight:bold}
-button:disabled{opacity:.4}
-.green{color:#27d69a}.red{color:#ff6c7d}
-#price{font-size:30px;font-weight:bold;margin:14px 0}
-#chart{width:100%;height:210px;background:#0d1726;border-radius:8px}
-#log{white-space:pre-wrap;max-height:180px;overflow:auto;
-font-size:11px;color:#b5c8df}
-.pill{border:1px solid #40516b;padding:6px 10px;border-radius:20px;font-size:12px}
-footer{color:#879ab4;font-size:11px;line-height:1.6}
+body{margin:0;background:#0b1020;color:#edf2ff;font-family:Arial,sans-serif}
+header{padding:18px;background:#121a30;border-bottom:1px solid #293653}
+h1{font-size:21px;margin:0;color:#64e6bd}
+header p{font-size:12px;color:#9aabc8;margin:6px 0 0}
+main{padding:14px;max-width:850px;margin:auto}
+.card{background:#141e35;border:1px solid #293958;border-radius:13px;padding:15px;margin-bottom:13px}
+.status{font-size:13px;padding:9px;border-radius:8px;background:#26334c;color:#ffcf70}
+.status.ok{color:#64e6bd}
+.status.bad{color:#ff8585}
+label{display:block;font-size:12px;color:#aab8d0;margin:12px 0 6px}
+select,button{width:100%;padding:12px;border-radius:8px;border:1px solid #3a4b6b;background:#0d162b;color:white;font-size:14px}
+button{background:#087e69;border:0;font-weight:bold;margin-top:12px}
+button.secondary{background:#293958}
+.row{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.price{font-size:27px;font-weight:bold;color:#64e6bd;margin:12px 0}
+.small{font-size:12px;color:#9aabc8}
+#chart{width:100%;height:220px;background:#0b1427;border-radius:9px}
+.log{font-size:12px;color:#aab8d0;max-height:140px;overflow:auto;line-height:1.7}
+.tag{display:inline-block;background:#263b55;border-radius:6px;padding:6px 9px;font-size:11px;margin:3px}
 </style>
 </head>
 <body>
+<header>
+<h1>DERIV AI BOT</h1>
+<p>AI Market Monitor · Forex & Synthetic Indices</p>
+</header>
+
 <main>
+<div class="card">
+<div id="status" class="status">Menghubungkan ke server Deriv...</div>
+<div class="small" style="margin-top:8px">Mode: DEMO MONITOR · Belum melakukan transaksi</div>
+</div>
+
+<div class="card">
+<b>Pengaturan Market</b>
+
+<label>Pilih kategori market</label>
+<select id="marketFilter">
+<option value="all">Semua Market</option>
+<option value="forex">Forex</option>
+<option value="synthetic">Synthetic Indices</option>
+</select>
+
+<label>Pilih instrumen</label>
+<select id="symbolSelect">
+<option value="">Menunggu daftar instrumen...</option>
+</select>
 
 <div class="row">
- <div>
-  <h2>DERIV AI BOT</h2>
-  <div class="muted">REALTIME MARKET ANALYZER</div>
- </div>
- <span class="pill">DEMO DATA</span>
+<div>
+<label>Timeframe</label>
+<select id="timeframe">
+<option value="60">M1</option>
+<option value="300">M5</option>
+<option value="900">M15</option>
+</select>
+</div>
+<div>
+<label>Jenis kontrak</label>
+<select id="contractType">
+<option value="both">Rise/Fall + Multipliers</option>
+<option value="risefall">Rise/Fall</option>
+<option value="multiplier">Multipliers</option>
+</select>
+</div>
 </div>
 
-<div class="panel">
- <div class="row">
-  <b>Koneksi Deriv</b>
-  <span id="status" class="pill red">OFFLINE</span>
- </div>
- <p class="muted" id="message">Belum terhubung.</p>
- <div class="grid">
-  <button id="connect">HUBUNGKAN</button>
-  <button id="disconnect" disabled>PUTUSKAN</button>
- </div>
+<button id="refreshBtn">MUAT ULANG MARKET</button>
 </div>
 
-<div class="panel">
- <b>PILIH PASAR</b>
- <select id="market">
-  <option value="all">Semua pasar</option>
-  <option value="synthetic">Synthetic Indices</option>
-  <option value="forex">Forex</option>
- </select>
-
- <b style="display:block;margin-top:14px">INSTRUMEN</b>
- <select id="symbol" disabled>
-  <option value="">Hubungkan dahulu</option>
- </select>
-
- <b style="display:block;margin-top:14px">TIMEFRAME</b>
- <select id="tf">
-  <option value="60">M1</option>
-  <option value="300">M5</option>
-  <option value="900">M15</option>
- </select>
-
- <div class="grid">
-  <button id="candles" disabled>AMBIL CANDLE</button>
-  <button id="live" disabled>MULAI LIVE</button>
- </div>
- <button id="contracts" class="secondary" disabled>CEK JENIS KONTRAK</button>
+<div class="card">
+<b>Harga Market</b>
+<div id="price" class="price">--</div>
+<div id="symbolInfo" class="small">Belum ada instrumen dipilih</div>
+<div id="tickTime" class="small" style="margin-top:6px">Menunggu harga...</div>
 </div>
 
-<div class="panel">
- <div class="row">
-  <b>HARGA REALTIME</b>
-  <span id="selected" class="muted">Belum dipilih</span>
- </div>
- <div id="price">—</div>
- <div id="ticktime" class="muted">Menunggu harga...</div>
+<div class="card">
+<b>Grafik Harga</b>
+<div class="small" style="margin:8px 0">Data candle dari Deriv</div>
+<canvas id="chart"></canvas>
+<div id="candleInfo" class="small" style="margin-top:8px">Menunggu data candle...</div>
 </div>
 
-<div class="panel">
- <div class="row">
-  <b>GRAFIK CANDLE</b>
-  <span id="count" class="muted">0 candle</span>
- </div>
- <canvas id="chart" width="700" height="240"></canvas>
- <p id="candleinfo" class="muted">Belum ada data candle.</p>
+<div class="card">
+<b>Jenis Kontrak</b>
+<div style="margin-top:10px">
+<span class="tag">RISE / FALL</span>
+<span class="tag">MULTIPLIERS</span>
+</div>
+<div id="contractInfo" class="small" style="margin-top:10px">
+Pilih instrumen untuk memeriksa kontrak yang tersedia.
+</div>
 </div>
 
-<div class="panel">
- <b>JENIS KONTRAK TERSEDIA</b>
- <div id="contractinfo" class="muted" style="margin-top:10px">
- Belum diperiksa.
- </div>
+<div class="card">
+<b>Aktivitas Sistem</b>
+<div id="logs" class="log">Memulai sistem...</div>
 </div>
-
-<div class="panel">
- <b>INFORMASI PASAR</b>
- <p class="muted" id="marketinfo">Belum ada data.</p>
- <div class="grid">
-  <div>
-   <div class="muted">Total instrumen</div>
-   <b id="total">0</b>
-  </div>
-  <div>
-   <div class="muted">Koneksi</div>
-   <b id="connectinfo">OFFLINE</b>
-  </div>
- </div>
-</div>
-
-<div class="panel">
- <div class="row">
-  <b>LOG SISTEM</b>
-  <button id="clear" style="width:auto">BERSIHKAN</button>
- </div>
- <div id="log">DERIV AI BOT SIAP.</div>
-</div>
-
-<footer>
-Tahap 1 hanya membaca data publik Deriv.
-Belum ada transaksi atau akses saldo akun.
-Jangan memasukkan password maupun token akun di halaman ini.
-</footer>
-
 </main>
 
 <script>
+(() => {
 "use strict";
 
-const ENDPOINT =
-"wss://api.derivws.com/trading/v1/options/ws/public";
+const ENDPOINT = "wss://api.derivws.com/trading/v1/options/ws/public";
+
+let ws = null;
+let symbols = [];
+let selectedSymbol = "";
+let tickSubscription = null;
+let reconnectTimer = null;
+let requestCounter = 10;
+let pending = {};
+let candles = [];
+let lastPrice = null;
+let connected = false;
 
 const $ = id => document.getElementById(id);
 
-let socket = null;
-let requestId = 0;
-let symbols = [];
-let candleData = [];
-let tickSubscription = null;
-let pending = new Map();
-
-function log(text){
- const time = new Date().toLocaleTimeString("id-ID");
- $("log").textContent =
- `[${time}] ${text}\n` + $("log").textContent;
+function log(message) {
+  const el = $("logs");
+  const time = new Date().toLocaleTimeString("id-ID");
+  el.innerHTML = `[${time}] ${escapeHtml(message)}<br>` + el.innerHTML;
 }
 
-function status(online,text){
- $("status").textContent = online ? "ONLINE" : "OFFLINE";
- $("status").className = "pill " + (online ? "green" : "red");
- $("message").textContent = text;
- $("connect").disabled = online;
- $("disconnect").disabled = !online;
- $("connectinfo").textContent = online ? "ONLINE" : "OFFLINE";
+function escapeHtml(value) {
+  return String(value).replace(/[&<>"']/g, c => ({
+    "&":"&amp;", "<":"&lt;", ">":"&gt;",
+    '"':"&quot;", "'":"&#39;"
+  })[c]);
 }
 
-function send(data){
- return new Promise((resolve,reject)=>{
-  if(!socket || socket.readyState !== WebSocket.OPEN){
-   reject(new Error("Koneksi belum aktif"));
-   return;
+function setStatus(message, type="") {
+  $("status").textContent = message;
+  $("status").className = "status " + type;
+}
+
+function send(data, callback) {
+  if (!ws || ws.readyState !== WebSocket.OPEN) {
+    log("Koneksi belum siap.");
+    return;
   }
 
-  const id = ++requestId;
+  const id = ++requestCounter;
   data.req_id = id;
-  pending.set(id,{resolve,reject});
-  socket.send(JSON.stringify(data));
 
-  setTimeout(()=>{
-   if(pending.has(id)){
-    pending.delete(id);
-    reject(new Error("Server tidak merespons"));
-   }
-  },12000);
- });
+  if (callback) pending[id] = callback;
+
+  ws.send(JSON.stringify(data));
+  return id;
 }
 
-function marketType(s){
- const v = [
-  s.market,
-  s.market_display_name,
-  s.submarket,
-  s.submarket_display_name,
-  s.display_name,
-  s.symbol
- ].join(" ").toLowerCase();
+function connect() {
+  clearTimeout(reconnectTimer);
 
- if(/forex/.test(v)) return "forex";
-
- if(/synthetic|derived|volatility|boom|crash|step|jump|drift|range.?break/.test(v))
-  return "synthetic";
-
- return "other";
-}
-
-function filtered(){
- const type = $("market").value;
- return symbols.filter(s=>
-  type==="all" || marketType(s)===type
- );
-}
-
-function renderSymbols(){
- const list = filtered();
- const select = $("symbol");
-
- select.innerHTML = "";
-
- if(!list.length){
-  select.add(new Option("Instrumen tidak ditemukan",""));
-  select.disabled = true;
-  $("candles").disabled = true;
-  $("live").disabled = true;
-  $("contracts").disabled = true;
-  return;
- }
-
- list.sort((a,b)=>
-  (a.display_name || a.symbol).localeCompare(
-   b.display_name || b.symbol
-  )
- );
-
- list.forEach(s=>{
-  select.add(new Option(
-   `${s.display_name || s.symbol} (${s.symbol})`,
-   s.symbol
-  ));
- });
-
- select.disabled = false;
- $("candles").disabled = false;
- $("live").disabled = false;
- $("contracts").disabled = false;
-
- $("total").textContent = symbols.length;
-
- const forex = symbols.filter(s=>marketType(s)==="forex").length;
- const synthetic = symbols.filter(s=>marketType(s)==="synthetic").length;
-
- $("marketinfo").textContent =
- `Forex: ${forex} instrumen | Synthetic: ${synthetic} instrumen`;
-
- updateSelected();
-}
-
-function updateSelected(){
- const s = symbols.find(x=>x.symbol===$("symbol").value);
- $("selected").textContent = s ?
-  (s.display_name || s.symbol) : "Belum dipilih";
-}
-
-function connect(){
- if(socket && socket.readyState===WebSocket.OPEN) return;
-
- status(false,"Menghubungkan ke Deriv...");
- log("Membuka WebSocket Deriv.");
-
- socket = new WebSocket(ENDPOINT);
-
- socket.onopen = async ()=>{
-  log("WebSocket berhasil tersambung.");
-  status(true,"Mengambil daftar instrumen...");
-  try{
-   const r = await send({active_symbols:"full"});
-
-   if(r.error) throw new Error(r.error.message);
-
-   symbols = r.active_symbols || [];
-
-   if(!symbols.length) throw new Error("Daftar instrumen kosong");
-
-   renderSymbols();
-
-   log(`${symbols.length} instrumen berhasil dimuat.`);
-   status(true,"Koneksi Deriv berhasil.");
-  }catch(e){
-   log("Gagal mengambil instrumen: "+e.message);
-   $("message").textContent = e.message;
-  }
- };
-
- socket.onmessage = event=>{
-  let data;
-  try{
-   data = JSON.parse(event.data);
-  }catch(e){return;}
-
-  if(data.req_id && pending.has(data.req_id)){
-   const p = pending.get(data.req_id);
-   pending.delete(data.req_id);
-   p.resolve(data);
+  if (ws) {
+    try { ws.close(); } catch(e) {}
   }
 
-  if(data.error){
-   log("API ERROR: "+data.error.message);
-   return;
+  connected = false;
+  setStatus("Menghubungkan ke Deriv...");
+
+  try {
+    ws = new WebSocket(ENDPOINT);
+  } catch(e) {
+    setStatus("Gagal membuat koneksi: " + e.message, "bad");
+    reconnectTimer = setTimeout(connect, 5000);
+    return;
   }
 
-  if(data.msg_type==="tick" && data.tick){
-   const t = data.tick;
-   $("price").textContent =
-    Number(t.quote).toLocaleString("en-US",
-    {maximumFractionDigits:8});
+  ws.onopen = () => {
+    connected = true;
+    setStatus("Terhubung. Meminta daftar market...", "ok");
+    log("WebSocket publik berhasil terhubung.");
+    loadSymbols();
+  };
 
-   $("ticktime").textContent =
-    "Waktu server: "+
-    new Date(t.epoch*1000).toLocaleString("id-ID");
+  ws.onmessage = event => {
+    let data;
+
+    try {
+      data = JSON.parse(event.data);
+    } catch(e) {
+      log("Respons server tidak dapat dibaca.");
+      return;
+    }
+
+    if (data.error) {
+      const message = data.error.message || "Kesalahan API";
+      log("API: " + message);
+      setStatus("API: " + message, "bad");
+
+      if (data.req_id && pending[data.req_id]) {
+        const cb = pending[data.req_id];
+        delete pending[data.req_id];
+        cb(null, data);
+      }
+      return;
+    }
+
+    if (data.req_id && pending[data.req_id]) {
+      const cb = pending[data.req_id];
+      delete pending[data.req_id];
+      cb(data, null);
+    }
+
+    if (data.msg_type === "active_symbols") {
+      handleSymbols(data);
+    }
+
+    if (data.msg_type === "tick") {
+      handleTick(data);
+    }
+
+    if (data.msg_type === "history") {
+      handleHistory(data);
+    }
+
+    if (data.msg_type === "candles") {
+      handleCandles(data);
+    }
+
+    if (data.msg_type === "contracts_for") {
+      handleContracts(data);
+    }
+  };
+
+  ws.onerror = () => {
+    setStatus("Koneksi mengalami gangguan.", "bad");
+    log("WebSocket mengalami error.");
+  };
+
+  ws.onclose = () => {
+    connected = false;
+    setStatus("Koneksi terputus. Mencoba kembali...", "bad");
+    log("Koneksi terputus.");
+    reconnectTimer = setTimeout(connect, 5000);
+  };
+}
+
+function loadSymbols() {
+  send({ active_symbols: "full" }, (data, error) => {
+    if (error) return;
+
+    if (!data || !Array.isArray(data.active_symbols)) {
+      log("Format daftar instrumen tidak dikenali.");
+      setStatus("Daftar market tidak ditemukan.", "bad");
+      return;
+    }
+
+    symbols = data.active_symbols
+      .map(normalizeSymbol)
+      .filter(item => item.symbol);
+
+    symbols.sort((a,b) => a.name.localeCompare(b.name));
+
+    log("Instrumen diterima: " + symbols.length);
+    renderSymbols();
+
+    if (symbols.length > 0) {
+      setStatus("Market berhasil dimuat: " + symbols.length + " instrumen", "ok");
+      if (!$("symbolSelect").value) {
+        $("symbolSelect").selectedIndex = 0;
+      }
+      selectCurrentSymbol();
+    } else {
+      setStatus("Tidak ada instrumen aktif yang diterima.", "bad");
+    }
+  });
+}
+
+function normalizeSymbol(item) {
+  const symbol = item.underlying_symbol ||
+                 item.symbol ||
+                 item.underlying ||
+                 "";
+
+  const name = item.underlying_symbol_name ||
+               item.display_name ||
+               item.name ||
+               symbol;
+
+  const market = String(item.market || "").toLowerCase();
+  const submarket = String(item.submarket || "").toLowerCase();
+  const marketName = String(item.market_display_name || "").toLowerCase();
+  const submarketName = String(item.submarket_display_name || "").toLowerCase();
+  const combined = [market, submarket, marketName, submarketName, name, symbol]
+                   .join(" ").toLowerCase();
+
+  let category = "other";
+
+  if (
+    combined.includes("forex") ||
+    combined.includes("major_pairs") ||
+    combined.includes("minor_pairs") ||
+    combined.includes("exotic_pairs")
+  ) {
+    category = "forex";
+  } else if (
+    combined.includes("synthetic") ||
+    combined.includes("random_index") ||
+    combined.includes("volatility") ||
+    combined.includes("crash") ||
+    combined.includes("boom") ||
+    combined.includes("step index") ||
+    combined.includes("jump") ||
+    combined.includes("1hz") ||
+    /^r_(10|25|50|75|100)$/i.test(symbol)
+  ) {
+    category = "synthetic";
   }
- };
 
- socket.onerror = ()=>{
-  log("Kesalahan koneksi WebSocket.");
- };
-
- socket.onclose = ()=>{
-  log("Koneksi ditutup.");
-  socket = null;
-  tickSubscription = null;
-
-  pending.forEach(p=>p.reject(new Error("Koneksi ditutup")));
-  pending.clear();
-
-  status(false,"Koneksi terputus.");
- };
+  return {symbol, name, category, raw:item};
 }
 
-function disconnect(){
- if(socket) socket.close();
-}
+function renderSymbols() {
+  const filter = $("marketFilter").value;
+  const select = $("symbolSelect");
+  const previous = selectedSymbol;
 
-async function loadCandles(){
- const symbol = $("symbol").value;
- if(!symbol) return;
+  const filtered = symbols.filter(item =>
+    filter === "all" || item.category === filter
+  );
 
- $("candleinfo").textContent = "Mengambil data candle...";
+  select.innerHTML = "";
 
- try{
-  const r = await send({
-   ticks_history:symbol,
-   count:100,
-   end:"latest",
-   style:"candles",
-   granularity:Number($("tf").value)
+  if (!filtered.length) {
+    select.innerHTML = '<option value="">Tidak ada instrumen pada kategori ini</option>';
+    $("symbolInfo").textContent = "Tidak ada instrumen yang cocok.";
+    return;
+  }
+
+  filtered.forEach(item => {
+    const option = document.createElement("option");
+    option.value = item.symbol;
+    option.textContent = item.name + " (" + item.symbol + ")";
+    select.appendChild(option);
   });
 
-  if(r.error) throw new Error(r.error.message);
-
-  candleData = r.candles || [];
-
-  drawChart();
-
-  $("count").textContent = candleData.length+" candle";
-  $("candleinfo").textContent =
-   "Data candle diterima dari Deriv.";
-
-  log(`${candleData.length} candle diterima: ${symbol}`);
- }catch(e){
-  $("candleinfo").textContent = e.message;
-  log("Candle error: "+e.message);
- }
-}
-
-function drawChart(){
- const c = $("chart");
- const ctx = c.getContext("2d");
- const w=c.width,h=c.height;
-
- ctx.clearRect(0,0,w,h);
- ctx.fillStyle="#0d1726";
- ctx.fillRect(0,0,w,h);
-
- if(!candleData.length){
-  ctx.fillStyle="#9aabc2";
-  ctx.fillText("Belum ada data candle",20,30);
-  return;
- }
-
- const values = candleData.flatMap(x=>[
-  Number(x.high),Number(x.low)
- ]);
-
- let min=Math.min(...values);
- let max=Math.max(...values);
-
- if(max===min){max++;min--;}
-
- const pad=18;
- const usableH=h-pad*2;
- const usableW=w-pad*2;
-
- const y=v=>pad+(max-v)/(max-min)*usableH;
- const step=usableW/candleData.length;
- const body=Math.max(2,step*.55);
-
- ctx.strokeStyle="#26364d";
-
- for(let i=0;i<5;i++){
-  const yy=pad+i*usableH/4;
-  ctx.beginPath();
-  ctx.moveTo(pad,yy);
-  ctx.lineTo(w-pad,yy);
-  ctx.stroke();
- }
-
- candleData.forEach((x,i)=>{
-  const xx=pad+i*step+step/2;
-  const o=Number(x.open);
-  const cl=Number(x.close);
-  const hi=Number(x.high);
-  const lo=Number(x.low);
-
-  const color=cl>=o ? "#22c58b" : "#ff647c";
-
-  ctx.strokeStyle=color;
-  ctx.fillStyle=color;
-
-  ctx.beginPath();
-  ctx.moveTo(xx,y(hi));
-  ctx.lineTo(xx,y(lo));
-  ctx.stroke();
-
-  const top=Math.min(y(o),y(cl));
-  const height=Math.max(2,Math.abs(y(o)-y(cl)));
-
-  ctx.fillRect(xx-body/2,top,body,height);
- });
-}
-
-async function startLive(){
- const symbol=$("symbol").value;
- if(!symbol) return;
-
- try{
-  if(tickSubscription){
-   await send({forget:tickSubscription}).catch(()=>{});
-   tickSubscription=null;
+  if (filtered.some(x => x.symbol === previous)) {
+    select.value = previous;
   }
 
-  const r=await send({
-   ticks:symbol,
-   subscribe:1
+  if (select.selectedIndex < 0) select.selectedIndex = 0;
+}
+
+function selectCurrentSymbol() {
+  const symbol = $("symbolSelect").value;
+  if (!symbol) return;
+
+  if (symbol === selectedSymbol && tickSubscription) return;
+
+  selectedSymbol = symbol;
+  candles = [];
+  lastPrice = null;
+  $("price").textContent = "--";
+  $("tickTime").textContent = "Mengambil harga...";
+  $("candleInfo").textContent = "Mengambil candle...";
+  $("symbolInfo").textContent = symbol;
+
+  if (tickSubscription) {
+    send({ forget: tickSubscription });
+    tickSubscription = null;
+  }
+
+  send({
+    ticks: symbol,
+    subscribe: 1
+  }, (data, error) => {
+    if (error) return;
+    if (data && data.subscription) {
+      tickSubscription = data.subscription.id;
+    }
   });
 
-  if(r.error) throw new Error(r.error.message);
+  loadCandles();
+  checkContracts();
 
-  tickSubscription=r.subscription?.id || null;
-
-  log("Harga realtime aktif: "+symbol);
- }catch(e){
-  log("Live error: "+e.message);
- }
+  log("Memilih instrumen " + symbol);
 }
 
-async function checkContracts(){
- const symbol=$("symbol").value;
- if(!symbol)return;
+function handleTick(data) {
+  if (!data.tick) return;
 
- $("contractinfo").textContent="Memeriksa kontrak...";
+  const tick = data.tick;
 
- try{
-  const r=await send({contracts_for:symbol});
+  if (tick.symbol && tick.symbol !== selectedSymbol) return;
 
-  if(r.error)throw new Error(r.error.message);
+  lastPrice = Number(tick.quote);
+  $("price").textContent = Number.isFinite(lastPrice)
+    ? lastPrice.toLocaleString("en-US", {maximumFractionDigits:8})
+    : "--";
 
-  const list=r.contracts_for?.available || [];
+  const date = new Date(Number(tick.epoch) * 1000);
+  $("tickTime").textContent =
+    "Harga realtime · " + date.toLocaleTimeString("id-ID");
 
-  if(!list.length){
-   $("contractinfo").textContent=
-    "Tidak ada kontrak yang dikembalikan server.";
-   return;
+  $("symbolInfo").textContent = selectedSymbol + " · Live";
+}
+
+function loadCandles() {
+  if (!selectedSymbol) return;
+
+  const granularity = Number($("timeframe").value);
+
+  send({
+    ticks_history: selectedSymbol,
+    style: "candles",
+    granularity: granularity,
+    count: 100,
+    end: "latest"
+  }, (data, error) => {
+    if (error) return;
+
+    if (data && Array.isArray(data.candles)) {
+      candles = data.candles;
+      drawChart();
+      log("Candle berhasil dimuat: " + candles.length);
+    } else if (data && data.history) {
+      log("Server mengirim format history, bukan candles.");
+    }
+  });
+}
+
+function handleHistory(data) {
+  if (data.history) {
+    log("Data history diterima.");
+  }
+}
+
+function handleCandles(data) {
+  if (data.candles) {
+    candles = data.candles;
+    drawChart();
+  }
+}
+
+function drawChart() {
+  const canvas = $("chart");
+  const ctx = canvas.getContext("2d");
+  const width = canvas.clientWidth || 320;
+  const height = 220;
+  const dpr = window.devicePixelRatio || 1;
+
+  canvas.width = width * dpr;
+  canvas.height = height * dpr;
+  ctx.scale(dpr, dpr);
+  ctx.clearRect(0,0,width,height);
+
+  if (!candles.length) {
+    ctx.fillStyle = "#9aabc8";
+    ctx.font = "13px Arial";
+    ctx.fillText("Menunggu data candle...", 15, 30);
+    return;
   }
 
-  const types=list.map(x=>x.contract_type).filter(Boolean);
-  const wanted=["CALL","PUT","MULTUP","MULTDOWN"];
+  const data = candles.slice(-45);
+  const values = data.flatMap(c => [
+    Number(c.high), Number(c.low)
+  ]).filter(Number.isFinite);
 
-  $("contractinfo").innerHTML =
-   "<b>Kontrak yang ditemukan:</b><br>" +
-   [...new Set(types)].map(x=>{
-    const supported=wanted.includes(x);
-    return `<div style="margin-top:6px" class="${supported?"green":"muted"}">${x} ${supported?"✓":" "}</div>`;
-   }).join("");
+  if (!values.length) return;
 
-  log("Pemeriksaan kontrak selesai: "+symbol);
- }catch(e){
-  $("contractinfo").textContent=e.message;
-  log("Kontrak error: "+e.message);
- }
+  let min = Math.min(...values);
+  let max = Math.max(...values);
+
+  if (max === min) {
+    max += 1;
+    min -= 1;
+  }
+
+  const pad = 12;
+  const chartH = height - 25;
+  const scaleY = v => pad + (max-v)/(max-min)*(chartH-pad);
+  const step = (width-20)/data.length;
+  const bodyWidth = Math.max(2, step*0.55);
+
+  data.forEach((c,i) => {
+    const x = 10 + i*step + step/2;
+    const open = Number(c.open);
+    const close = Number(c.close);
+    const high = Number(c.high);
+    const low = Number(c.low);
+
+    const up = close >= open;
+    const color = up ? "#35d6a0" : "#ff687d";
+
+    ctx.strokeStyle = color;
+    ctx.fillStyle = color;
+    ctx.lineWidth = 1;
+
+    ctx.beginPath();
+    ctx.moveTo(x,scaleY(high));
+    ctx.lineTo(x,scaleY(low));
+    ctx.stroke();
+
+    const y1 = scaleY(open);
+    const y2 = scaleY(close);
+    const top = Math.min(y1,y2);
+    const bodyHeight = Math.max(1,Math.abs(y2-y1));
+
+    ctx.fillRect(x-bodyWidth/2,top,bodyWidth,bodyHeight);
+  });
+
+  const last = data[data.length-1];
+  $("candleInfo").textContent =
+    "Candle: " + data.length +
+    " · Open: " + last.open +
+    " · Close: " + last.close;
 }
 
-$("connect").onclick=connect;
-$("disconnect").onclick=disconnect;
-$("market").onchange=renderSymbols;
-$("symbol").onchange=()=>{
- updateSelected();
- candleData=[];
- drawChart();
- $("price").textContent="—";
- $("contractinfo").textContent="Belum diperiksa.";
-};
-$("candles").onclick=loadCandles;
-$("live").onclick=startLive;
-$("contracts").onclick=checkContracts;
+function checkContracts() {
+  if (!selectedSymbol) return;
 
-$("tf").onchange=()=>{
- if(socket && socket.readyState===WebSocket.OPEN)loadCandles();
-};
+  $("contractInfo").textContent = "Memeriksa kontrak...";
 
-$("clear").onclick=()=>{
- $("log").textContent="Log dibersihkan.";
-};
+  send({
+    contracts_for: selectedSymbol
+  }, (data, error) => {
+    if (error) {
+      $("contractInfo").textContent = "Kontrak belum dapat diperiksa.";
+      return;
+    }
 
-drawChart();
+    const list = data && data.contracts_for &&
+                 data.contracts_for.available;
+
+    if (Array.isArray(list)) {
+      const types = [...new Set(list.map(x =>
+        x.contract_category_display || x.contract_type || x.contract_category || ""
+      ).filter(Boolean))];
+
+      $("contractInfo").textContent = types.length
+        ? "Kontrak tersedia: " + types.join(", ")
+        : "Daftar kontrak diterima, tetapi nama kontrak tidak tersedia.";
+    } else {
+      $("contractInfo").textContent =
+        "Respons kontrak diterima. Perlu pemeriksaan format.";
+    }
+  });
+}
+
+$("marketFilter").addEventListener("change", () => {
+  renderSymbols();
+  selectCurrentSymbol();
+});
+
+$("symbolSelect").addEventListener("change", selectCurrentSymbol);
+
+$("timeframe").addEventListener("change", loadCandles);
+
+$("refreshBtn").addEventListener("click", () => {
+  if (!connected) {
+    connect();
+    return;
+  }
+  loadSymbols();
+});
+
+window.addEventListener("resize", drawChart);
+
+connect();
+
+})();
 </script>
 </body>
 </html>
