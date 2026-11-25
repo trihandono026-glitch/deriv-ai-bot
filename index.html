@@ -1,40 +1,586 @@
 
-async function connectMarket(){
-  marketSymbol = "cryBTCUSD";
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Deriv AI Bot - Demo</title>
+<style>
+*{box-sizing:border-box}
+body{margin:0;padding:16px;background:#0b1220;color:#e8eefc;font:15px Arial,sans-serif}
+.wrap{max-width:650px;margin:auto}
+h2{color:#60a5fa;margin:4px 0}
+.card{background:#151f32;border:1px solid #293852;border-radius:13px;padding:15px;margin:12px 0}
+label{display:block;color:#aebbd0;font-size:13px;margin:10px 0 5px}
+input{width:100%;padding:12px;border-radius:8px;border:1px solid #40516d;background:#0b1425;color:white;font-size:15px}
+button{border:0;border-radius:9px;padding:13px;font-weight:bold;font-size:14px;cursor:pointer}
+.btn{background:#2563eb;color:white;width:100%;margin-top:10px}
+.green{background:#059669}.red{background:#dc2626}
+.row{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.stat{font-size:22px;font-weight:bold;margin-top:5px}
+.muted{color:#9aabc5;font-size:12px}
+#log{height:180px;overflow:auto;background:#080e19;border-radius:8px;padding:10px;font-size:12px;white-space:pre-wrap}
+</style>
+</head>
+<body>
+<div class="wrap">
+<h2>DERIV AI BOT</h2>
+<div class="muted">BTCUSD Crypto · Rise/Fall · 1 menit · DEMO ONLY</div>
 
-  publicWS = new WebSocket(PUBLIC_WS);
-  bindSocket(publicWS);
+<div class="card">
+<label>Personal Access Token (PAT)</label>
+<input id="pat" type="password" placeholder="Masukkan PAT di sini" autocomplete="off">
+<label>App ID</label>
+<input id="appId" value="353P9YQejqErbLpQ8jufw">
+<button class="btn" onclick="connectDeriv()">HUBUNGKAN AKUN DEMO</button>
+<p id="status" class="muted">Belum terhubung</p>
+<div class="row">
+<div><div class="muted">Saldo DEMO</div><div class="stat" id="balance">-</div></div>
+<div><div class="muted">Harga BTCUSD</div><div class="stat" id="price">-</div></div>
+</div>
+</div>
 
-  await new Promise((resolve,reject)=>{
-    const timer=setTimeout(
-      ()=>reject(Error("Koneksi data pasar timeout.")),12000
-    );
-    publicWS.onopen=()=>{
-      clearTimeout(timer);
-      resolve();
-    };
-    publicWS.onerror=()=>{
-      clearTimeout(timer);
-      reject(Error("Gagal terhubung ke data pasar."));
-    };
-  });
+<div class="card">
+<b>Pengaturan Risiko</b>
+<div class="row">
+<div><label>Stake USD</label><input id="stake" type="number" min="0.35" step="0.01" value="0.35"></div>
+<div><label>Batas rugi harian USD</label><input id="maxLoss" type="number" min="0.1" value="3"></div>
+<div><label>Maks. kalah beruntun</label><input id="maxConsec" type="number" min="1" value="3"></div>
+<div><label>Jeda transaksi (detik)</label><input id="cooldown" type="number" min="30" value="60"></div>
+</div>
+<div class="row">
+<div><div class="muted">Profit/rugi hari ini</div><div class="stat" id="daily">0.00</div></div>
+<div><div class="muted">Kalah beruntun</div><div class="stat" id="losses">0</div></div>
+</div>
+<button class="btn green" id="startBtn" onclick="startBot()" disabled>START AUTO DEMO</button>
+<button class="btn red" onclick="stopBot()">STOP BOT</button>
+<p class="muted">Satu kontrak aktif pada satu waktu. Tidak menggunakan martingale. STOP menghentikan transaksi baru, bukan membatalkan kontrak yang sudah dibeli.</p>
+</div>
 
-  // Uji apakah simbol benar-benar tersedia
-  const test = await wsRequest(publicWS,{
-    ticks_history: marketSymbol,
-    count: 2,
-    end: "latest",
-    style: "ticks"
-  });
+<div class="card">
+<b>Analisis Pasar</b>
+<div class="stat" id="signal">MENUNGGU DATA</div>
+<div id="reason" class="muted">Hubungkan akun untuk memulai.</div>
+</div>
 
-  if(!test.history && !test.candles){
-    throw Error("Deriv tidak mengirim data untuk cryBTCUSD.");
+<div class="card">
+<b>Jurnal Transaksi</b>
+<div id="journal" class="muted">Belum ada transaksi.</div>
+</div>
+
+<div class="card">
+<b>Log Aktivitas</b>
+<div id="log"></div>
+</div>
+</div>
+
+<script>
+"use strict";
+
+const API="https://api.derivws.com";
+const PUBLIC_WS="wss://api.derivws.com/trading/v1/options/ws/public";
+const APP_DEFAULT="353P9YQejqErbLpQ8jufw";
+const SYMBOL="cryBTCUSD";
+
+let pat="",appId="",account=null;
+let publicWS=null,tradeWS=null;
+let connected=false,running=false,busy=false;
+let activeContract=null,marketSymbol=SYMBOL;
+let reqId=10,lastCandle=0,lastTrade=0;
+let dailyPL=0,consecutiveLosses=0;
+let dayKey=new Date().toDateString();
+let journal=[];
+const pending=new Map();
+
+function log(message){
+ const el=document.getElementById("log");
+ el.textContent=new Date().toLocaleTimeString()+"  "+message+"\n"+el.textContent;
+}
+function setStatus(message){
+ document.getElementById("status").textContent=message;
+}
+function money(value){
+ return Number(value||0).toFixed(2);
+}
+function nextId(){return ++reqId}
+
+function bindSocket(ws){
+ ws.onmessage=function(event){
+  let data;
+  try{data=JSON.parse(event.data)}catch(e){return}
+
+  if(data.req_id && pending.has(data.req_id)){
+   const item=pending.get(data.req_id);
+   pending.delete(data.req_id);
+   clearTimeout(item.timer);
+   if(data.error)item.reject(new Error(data.error.message||"API error"));
+   else item.resolve(data);
   }
 
-  await wsRequest(publicWS,{
-    ticks: marketSymbol,
-    subscribe: 1
+  if(data.msg_type==="tick" && data.tick){
+   document.getElementById("price").textContent=
+    Number(data.tick.quote).toLocaleString("en-US");
+  }
+
+  if(data.msg_type==="balance" && data.balance){
+   document.getElementById("balance").textContent=
+    money(data.balance.balance)+" "+(data.balance.currency||"");
+  }
+
+  if(data.msg_type==="proposal_open_contract" && data.proposal_open_contract){
+   if(data.proposal_open_contract.is_sold){
+    finishContract(data.proposal_open_contract);
+   }
+  }
+ };
+
+ ws.onerror=function(){log("Koneksi WebSocket mengalami gangguan.")};
+
+ ws.onclose=function(){
+  if(ws===tradeWS){
+   connected=false;
+   running=false;
+   document.getElementById("startBtn").disabled=true;
+   setStatus("Koneksi akun terputus. Bot dihentikan.");
+  }
+ };
+}
+
+function wsRequest(ws,request,timeout=15000){
+ return new Promise((resolve,reject)=>{
+  if(!ws || ws.readyState!==WebSocket.OPEN){
+   reject(new Error("WebSocket belum siap"));
+   return;
+  }
+  const id=nextId();
+  request.req_id=id;
+  const timer=setTimeout(()=>{
+   pending.delete(id);
+   reject(new Error("Permintaan API timeout"));
+  },timeout);
+  pending.set(id,{resolve,reject,timer});
+  ws.send(JSON.stringify(request));
+ });
+}
+
+async function connectDeriv(){
+ try{
+  stopBot();
+  if(tradeWS){try{tradeWS.close()}catch(e){}}
+  if(publicWS){try{publicWS.close()}catch(e){}}
+
+  pat=document.getElementById("pat").value.trim();
+  appId=document.getElementById("appId").value.trim();
+
+  if(!pat || !appId)throw Error("Masukkan PAT dan App ID.");
+
+  const headers={
+   "Authorization":"Bearer "+pat,
+   "Deriv-App-ID":appId,
+   "Content-Type":"application/json"
+  };
+
+  setStatus("Memeriksa akun DEMO...");
+
+  const response=await fetch(API+"/trading/v1/options/accounts",{headers});
+  const result=await response.json();
+
+  if(!response.ok){
+   throw Error(result?.errors?.[0]?.message||"Gagal mengambil akun.");
+  }
+
+  const accounts=findAccounts(result);
+  account=accounts.find(a=>{
+   const type=String(a.account_type||a.type||"").toLowerCase();
+   const id=String(a.account_id||a.id||"").toUpperCase();
+   return type.includes("demo") || id.startsWith("VRTC") || id.startsWith("VR");
   });
 
-  log("BTCUSD berhasil ditemukan: " + marketSymbol);
+  if(!account){
+   throw Error("Akun DEMO tidak ditemukan. Periksa izin PAT.");
+  }
+
+  const accountId=account.account_id||account.id;
+  if(!accountId)throw Error("ID akun DEMO tidak ditemukan.");
+
+  setStatus("Meminta OTP akun DEMO...");
+
+  const otpResponse=await fetch(
+   API+"/trading/v1/options/accounts/"+encodeURIComponent(accountId)+"/otp",
+   {method:"POST",headers}
+  );
+  const otpResult=await otpResponse.json();
+
+  if(!otpResponse.ok){
+   throw Error(otpResult?.errors?.[0]?.message||"Gagal meminta OTP.");
+  }
+
+  const wsUrl=otpResult?.data?.url||otpResult?.url;
+  if(!wsUrl)throw Error("URL WebSocket OTP tidak ditemukan.");
+
+  tradeWS=new WebSocket(wsUrl);
+  bindSocket(tradeWS);
+
+  await waitForOpen(tradeWS);
+
+  connected=true;
+  setStatus("Akun DEMO terhubung.");
+
+  try{
+   const bal=await wsRequest(tradeWS,{balance:1,subscribe:1});
+   if(bal.balance){
+    document.getElementById("balance").textContent=
+     money(bal.balance.balance)+" "+(bal.balance.currency||"");
+   }
+  }catch(e){log("Saldo: "+e.message)}
+
+  await connectMarket();
+
+  document.getElementById("startBtn").disabled=false;
+  setStatus("TERHUBUNG · DEMO · "+SYMBOL);
+  log("Akun DEMO berhasil terhubung: "+accountId);
+
+ }catch(error){
+  connected=false;
+  document.getElementById("startBtn").disabled=true;
+  setStatus("Gagal: "+error.message);
+  log("ERROR: "+error.message);
+ }
 }
+
+function findAccounts(obj){
+ if(!obj || typeof obj!=="object")return [];
+ if(Array.isArray(obj))return obj.filter(x=>x&&typeof x==="object");
+ if(Array.isArray(obj.accounts))return obj.accounts;
+ if(obj.data){
+  if(Array.isArray(obj.data))return obj.data;
+  if(Array.isArray(obj.data.accounts))return obj.data.accounts;
+ }
+ for(const value of Object.values(obj)){
+  if(value && typeof value==="object"){
+   const found=findAccounts(value);
+   if(found.length)return found;
+  }
+ }
+ return [];
+}
+
+function waitForOpen(ws){
+ return new Promise((resolve,reject)=>{
+  const timer=setTimeout(()=>reject(Error("Koneksi WebSocket timeout.")),15000);
+  ws.addEventListener("open",()=>{clearTimeout(timer);resolve()},{once:true});
+  ws.addEventListener("error",()=>{clearTimeout(timer);reject(Error("WebSocket gagal dibuka."))},{once:true});
+ });
+}
+
+/* Pencarian simbol dibuat fleksibel.
+   Jika daftar simbol berbeda bentuk, bot mencoba cryBTCUSD langsung. */
+function collectSymbols(obj,output=[]){
+ if(!obj || typeof obj!=="object")return output;
+ if(Array.isArray(obj)){
+  for(const item of obj)collectSymbols(item,output);
+  return output;
+ }
+ if(typeof obj.symbol==="string"){
+  output.push(obj);
+ }
+ for(const value of Object.values(obj)){
+  if(value && typeof value==="object")collectSymbols(value,output);
+ }
+ return output;
+}
+
+async function connectMarket(){
+ publicWS=new WebSocket(PUBLIC_WS);
+ bindSocket(publicWS);
+ await waitForOpen(publicWS);
+
+ let symbols=[];
+ try{
+  const response=await wsRequest(publicWS,{active_symbols:"brief"});
+  symbols=collectSymbols(response.active_symbols||response.data||response);
+ }catch(error){
+  log("Daftar simbol tidak terbaca: "+error.message);
+ }
+
+ const found=symbols.find(item=>
+  String(item.symbol||"").toLowerCase()===SYMBOL.toLowerCase()
+ );
+
+ if(found){
+  marketSymbol=found.symbol;
+  log("Simbol ditemukan dari daftar: "+marketSymbol);
+ }else{
+  marketSymbol=SYMBOL;
+  log("Simbol tidak muncul di daftar. Menguji cryBTCUSD secara langsung...");
+ }
+
+ // Verifikasi simbol dengan permintaan candle
+ const test=await wsRequest(publicWS,{
+  ticks_history:marketSymbol,
+  count:3,
+  end:"latest",
+  granularity:60,
+  style:"candles"
+ });
+
+ if(!Array.isArray(test.candles) || test.candles.length===0){
+  throw Error("cryBTCUSD tidak mengirim data candle. Periksa ketersediaan simbol pada akun/wilayah.");
+ }
+
+ await wsRequest(publicWS,{ticks:marketSymbol,subscribe:1});
+ document.getElementById("price").textContent=
+  Number(test.candles[test.candles.length-1].close).toLocaleString("en-US");
+
+ log("BTCUSD berhasil diverifikasi: "+marketSymbol);
+}
+
+function ema(values,period){
+ if(values.length<period)return null;
+ let value=values.slice(0,period).reduce((a,b)=>a+b,0)/period;
+ const k=2/(period+1);
+ for(let i=period;i<values.length;i++){
+  value=values[i]*k+value*(1-k);
+ }
+ return value;
+}
+
+function direction(candles){
+ const closes=candles.map(c=>Number(c.close));
+ if(closes.length<30)return "WAIT";
+ const fast=ema(closes,9);
+ const slow=ema(closes,21);
+ const last=closes[closes.length-1];
+ if(fast>slow && last>fast)return "CALL";
+ if(fast<slow && last<fast)return "PUT";
+ return "WAIT";
+}
+
+async function getCandles(granularity){
+ const response=await wsRequest(publicWS,{
+  ticks_history:marketSymbol,
+  adjust_start_time:1,
+  count:100,
+  end:"latest",
+  granularity,
+  style:"candles"
+ });
+ return response.candles||[];
+}
+
+async function analyze(){
+ const [m1,m5,m15]=await Promise.all([
+  getCandles(60),getCandles(300),getCandles(900)
+ ]);
+
+ const d1=direction(m1);
+ const d5=direction(m5);
+ const d15=direction(m15);
+ const latest=m1[m1.length-1];
+
+ let signal="WAIT";
+ let reason="Arah ketiga timeframe belum sejalan.";
+
+ if(d1!=="WAIT" && d1===d5 && d5===d15){
+  const body=Math.abs(Number(latest.close)-Number(latest.open));
+  const range=Number(latest.high)-Number(latest.low);
+  if(range>0 && body/range>=0.35){
+   signal=d1;
+   reason="M1, M5, dan M15 searah; candle terakhir cukup tegas.";
+  }else{
+   reason="Arah sejalan, tetapi candle belum cukup kuat.";
+  }
+ }
+
+ document.getElementById("signal").textContent=
+  signal==="WAIT"?"TUNGGU":signal==="CALL"?"RISE":"FALL";
+ document.getElementById("reason").textContent=
+  reason+" | M1 "+d1+" · M5 "+d5+" · M15 "+d15;
+
+ return {signal,epoch:Number(latest.epoch)};
+}
+
+function resetDay(){
+ const today=new Date().toDateString();
+ if(today!==dayKey){
+  dayKey=today;
+  dailyPL=0;
+  consecutiveLosses=0;
+  updateStats();
+ }
+}
+
+function updateStats(){
+ document.getElementById("daily").textContent=money(dailyPL);
+ document.getElementById("losses").textContent=consecutiveLosses;
+}
+
+function limitsOK(){
+ resetDay();
+ const maxLoss=Math.abs(Number(document.getElementById("maxLoss").value));
+ const maxConsec=Math.max(1,Number(document.getElementById("maxConsec").value));
+
+ if(dailyPL<=-maxLoss){
+  stopBot();
+  log("STOP OTOMATIS: batas rugi harian tercapai.");
+  return false;
+ }
+ if(consecutiveLosses>=maxConsec){
+  stopBot();
+  log("STOP OTOMATIS: batas kalah beruntun tercapai.");
+  return false;
+ }
+ return true;
+}
+
+function startBot(){
+ if(!connected || !tradeWS || tradeWS.readyState!==WebSocket.OPEN){
+  log("Hubungkan akun DEMO terlebih dahulu.");
+  return;
+ }
+ if(!marketSymbol){
+  log("Data BTCUSD belum siap.");
+  return;
+ }
+ if(running)return;
+ running=true;
+ log("AUTO DEMO DIMULAI.");
+ scanLoop();
+}
+
+function stopBot(){
+ running=false;
+ log("Bot dihentikan. Kontrak yang sudah dibeli tetap berjalan sampai selesai.");
+}
+
+async function scanLoop(){
+ if(!running)return;
+ if(!limitsOK())return;
+
+ if(busy || activeContract){
+  setTimeout(scanLoop,3000);
+  return;
+ }
+
+ try{
+  const result=await analyze();
+  if(!running)return;
+
+  if(result.epoch!==lastCandle){
+   lastCandle=result.epoch;
+   const cooldown=Math.max(30,Number(document.getElementById("cooldown").value))*1000;
+
+   if(result.signal!=="WAIT" && Date.now()-lastTrade>=cooldown){
+    await placeTrade(result.signal);
+   }
+  }
+ }catch(error){
+  log("Analisis gagal: "+error.message);
+ }
+
+ if(running)setTimeout(scanLoop,7000);
+}
+
+async function placeTrade(side){
+ if(busy || activeContract || !running)return;
+ busy=true;
+
+ try{
+  if(!limitsOK())return;
+
+  const stake=Number(document.getElementById("stake").value);
+  if(!Number.isFinite(stake) || stake<0.35){
+   throw Error("Stake tidak valid. Minimal pengaturan bot 0.35 USD.");
+  }
+
+  const currency=account.currency||"USD";
+
+  const proposalResponse=await wsRequest(tradeWS,{
+   proposal:1,
+   amount:stake,
+   basis:"stake",
+   contract_type:side,
+   currency:currency,
+   duration:1,
+   duration_unit:"m",
+   underlying_symbol:marketSymbol
+  });
+
+  const proposal=proposalResponse.proposal||proposalResponse;
+  if(!proposal.id || !proposal.ask_price){
+   throw Error("Proposal tidak lengkap. Tidak membeli kontrak.");
+  }
+
+  const buyResponse=await wsRequest(tradeWS,{
+   buy:proposal.id,
+   price:Number(proposal.ask_price)
+  });
+
+  const bought=buyResponse.buy||buyResponse;
+  if(!bought.contract_id){
+   throw Error("ID kontrak tidak diterima.");
+  }
+
+  activeContract=bought.contract_id;
+  lastTrade=Date.now();
+
+  log("KONTRAK DIBUKA: "+side+" · Stake "+money(stake));
+
+  await wsRequest(tradeWS,{
+   proposal_open_contract:1,
+   contract_id:activeContract,
+   subscribe:1
+  });
+
+ }catch(error){
+  log("TRANSAKSI GAGAL: "+error.message);
+ }finally{
+  busy=false;
+ }
+}
+
+function finishContract(contract){
+ if(!activeContract ||
+    String(contract.contract_id)!==String(activeContract))return;
+
+ const profit=Number(contract.profit||0);
+ dailyPL+=profit;
+
+ if(profit>0){
+  consecutiveLosses=0;
+ }else{
+  consecutiveLosses++;
+ }
+
+ journal.unshift({
+  result:profit>0?"WIN":"LOSS",
+  profit:profit,
+  time:new Date().toLocaleTimeString()
+ });
+
+ document.getElementById("journal").innerHTML=
+  journal.slice(0,20).map(item=>
+   item.time+" · "+item.result+" · "+money(item.profit)
+  ).join("<br>");
+
+ activeContract=null;
+ updateStats();
+
+ log("KONTRAK SELESAI: "+(profit>0?"WIN":"LOSS")+" · P/L "+money(profit));
+
+ if(running)limitsOK();
+}
+
+document.getElementById("appId").value=APP_DEFAULT;
+updateStats();
+
+window.addEventListener("beforeunload",()=>{
+ running=false;
+ try{
+  if(publicWS)publicWS.close();
+  if(tradeWS)tradeWS.close();
+ }catch(e){}
+});
+</script>
+</body>
+</html>
