@@ -1,0 +1,377 @@
+<!doctype html>
+<html lang="id">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="theme-color" content="#09111f">
+<title>Deriv AI Bot v14 — Out-of-Sample Validation Lab</title>
+<style>
+:root{color-scheme:dark;--bg:#09111f;--panel:#121f32;--line:#263951;--muted:#9aadc5;--blue:#287bd1;--green:#20c997;--red:#ff647c;--yellow:#f4c45e}*{box-sizing:border-box}body{margin:0;background:var(--bg);color:#edf4ff;font:14px system-ui,Arial,sans-serif}main{max-width:850px;margin:auto;padding:14px;padding-bottom:36px}.top,.row{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap}.top{padding:8px 2px 14px}h1{font-size:21px;margin:0}.sub,.muted,small{color:var(--muted)}.sub{font-size:12px}.panel{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:14px;margin:11px 0}.grid{display:grid;grid-template-columns:1fr 1fr;gap:9px}.grid3{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}label{display:block;color:var(--muted);font-size:12px;margin:12px 0 5px}select,button{width:100%;padding:12px;border-radius:9px;border:1px solid #344b67;background:#0c1727;color:#fff;font-size:14px}button{background:var(--blue);border:0;font-weight:700;margin-top:9px}button.secondary{background:#263951}button:disabled,select:disabled{opacity:.45}.pill{font-size:11px;border:1px solid var(--line);border-radius:30px;padding:6px 10px}.green{color:var(--green)}.red{color:var(--red)}.yellow{color:var(--yellow)}#price{font-size:30px;font-weight:750;margin:10px 0 3px;overflow-wrap:anywhere}canvas{width:100%;height:230px;background:#0b1727;border-radius:9px;display:block}.stat{background:#0c1727;padding:10px;border-radius:9px;min-width:0}.stat b{display:block;font-size:16px;margin-top:4px;overflow-wrap:anywhere}.signal{font-size:24px;font-weight:800;margin:8px 0}.log{white-space:pre-wrap;overflow:auto;max-height:170px;font:11px/1.5 ui-monospace,monospace;color:#bfd0e5}.note{font-size:12px;line-height:1.6;color:var(--muted)}.tfbox{display:grid;grid-template-columns:1fr 1fr;gap:9px}.tfcard{background:#0c1727;border:1px solid var(--line);border-radius:10px;padding:11px}.tfcard b{display:block;margin:5px 0}.tfcard small{font-size:11px}.divider{height:1px;background:var(--line);margin:12px 0}footer{font-size:11px;line-height:1.6;color:var(--muted);padding:8px 2px}@media(max-width:420px){main{padding:10px}.grid3{grid-template-columns:1fr 1fr}.panel{padding:12px}}
+</style></head><body><main>
+<header class="top"><div><h1>DERIV AI BOT v14 VALIDATION LAB</h1><div class="sub">V10 BASELINE + UJI KANDIDAT OUT-OF-SAMPLE · SINYAL LIVE TETAP</div></div><span id="badge" class="pill red">OFFLINE</span></header>
+<section class="panel"><div class="row"><b>Koneksi Deriv</b><span id="connectionText" class="muted">Belum terhubung</span></div><div class="grid"><button id="connect">HUBUNGKAN</button><button id="disconnect" class="secondary" disabled>PUTUSKAN</button></div><p id="statusMessage" class="note">Data pasar publik. Tidak perlu token untuk membaca harga dan candle.</p></section>
+<section class="panel"><b>PILIH PASAR</b><label for="market">Kategori</label><select id="market"><option value="all">Semua pasar</option><option value="forex">Forex</option><option value="synthetic">Synthetic Indices</option><option value="crypto">Cryptocurrency</option></select><label for="symbol">Instrumen</label><select id="symbol" disabled><option value="">Hubungkan dahulu</option></select><label for="tf">Timeframe grafik</label><select id="tf"><option value="60">M1</option><option value="300">M5</option><option value="900">M15</option><option value="1800">M30</option><option value="3600">H1</option></select><div class="grid"><button id="load" disabled>MUAT GRAFIK + ANALISIS</button><button id="live" disabled>AKTIFKAN HARGA LIVE</button></div><button id="checkContracts" class="secondary" disabled>PERIKSA KONTRAK TERSEDIA</button></section>
+<section class="panel"><div class="row"><b>HARGA SEKARANG</b><span id="selectedName" class="muted">Belum dipilih</span></div><div id="price">—</div><div id="tickTime" class="note">Belum menerima tick.</div></section>
+<section class="panel"><div class="row"><b>GRAFIK CANDLE</b><span id="candleCount" class="muted">0 candle</span></div><canvas id="chart" width="760" height="270"></canvas><p id="candleStatus" class="note">Pilih instrumen lalu muat grafik.</p></section>
+<section class="panel"><div class="row"><b>HASIL ANALISIS AKTIF M1 + M5</b><span id="analysisBadge" class="pill yellow">BELUM DIANALISIS</span></div><div id="signal" class="signal yellow">WAIT</div><p id="reason" class="note">M5 menjadi konteks arah, M1 mencari peluang lanjutan maupun pembalikan. Skor adalah kesesuaian aturan, bukan probabilitas profit. Sinyal aktif memakai filter seimbang: lebih responsif, tetapi tetap memeriksa arah candle, momentum, RSI, jarak harga, dan konteks M5.</p><div class="grid3"><div class="stat"><small>SKOR BUY</small><b id="buyScore">—</b></div><div class="stat"><small>SKOR SELL</small><b id="sellScore">—</b></div><div class="stat"><small>UJI ARAH 3 CANDLE</small><b id="validation">—</b></div></div><div class="row"><span id="scannerStatus" class="note">Pemindai otomatis OFF</span><button id="scanToggle" class="secondary" style="width:auto">MULAI PEMINDAI</button></div><div class="grid3" style="margin:9px 0"><div class="stat"><small>HARGA ACUAN SINYAL</small><b id="entryPrice">—</b></div><div class="stat"><small>WAKTU SINYAL</small><b id="entryTime">—</b></div><div class="stat"><small>MODE</small><b>MANUAL</b></div></div><div class="divider"></div><b>RENCANA ENTRY (BERDASARKAN ATR M1)</b><div class="grid3" style="margin:9px 0"><div class="stat"><small>ENTRY ACUAN</small><b id="planEntry">—</b></div><div class="stat"><small>STOP LOSS</small><b id="planSL" class="red">—</b></div><div class="stat"><small>TAKE PROFIT 1</small><b id="planTP1" class="green">—</b></div><div class="stat"><small>TAKE PROFIT 2</small><b id="planTP2" class="green">—</b></div><div class="stat"><small>JARAK RISIKO</small><b id="planRisk">—</b></div><div class="stat"><small>STATUS LEVEL</small><b id="planStatus">MENUNGGU</b></div></div><p class="note">Level indikatif dihitung dari harga acuan sinyal dan ATR M1: SL 1,0 ATR, TP1 1,5 ATR, TP2 2,5 ATR. Samakan harga entry dengan kuotasi MT5 dan hitung ulang level bila harga berbeda jauh. TP2 belum divalidasi terpisah oleh backtest; backtest membandingkan v9 dan v10 hanya menguji TP1 1,5 ATR. Bot tidak memasang order atau SL/TP ke MT5.</p><div class="tfbox"><div class="tfcard"><small>KONFIRMASI ARAH M5</small><b id="m5Direction">—</b><small id="m5Details">Menunggu candle M5</small></div><div class="tfcard"><small>PELUANG ENTRY M1</small><b id="m1Direction">—</b><small id="m1Details">Menunggu candle M1</small></div></div><div class="divider"></div><div class="grid3"><div class="stat"><small>EMA 9 M1</small><b id="emaFast">—</b></div><div class="stat"><small>EMA 21 M1</small><b id="emaSlow">—</b></div><div class="stat"><small>RSI 14 M1</small><b id="rsi">—</b></div></div><p class="note">BUY/SELL adalah sinyal setelah candle M1 selesai. Filter v10 lebih responsif daripada v9, tetapi tetap menahan kondisi yang tidak meyakinkan. Harga live memberi WASPADA mulai bergerak melawan 0,12 ATR dan BATAL sekitar 0,22 ATR; TERLEWAT jika bergerak searah 0,45 ATR. Ini pengaman, bukan jaminan profit. WAIT/WASPADA/BATAL berarti jangan membuka entry baru.</p></section>
+<section class="panel"><div class="row"><b>MARKET INTELLIGENCE</b><span id="healthBadge" class="pill yellow">MENUNGGU DATA</span></div><div class="grid3"><div class="stat"><small>PERINGATAN AWAL</small><b id="earlySignal">—</b></div><div class="stat"><small>BREAKOUT</small><b id="breakoutState">—</b></div><div class="stat"><small>RE-ENTRY</small><b id="reentryState">—</b></div></div><div class="divider"></div><div class="grid3"><div class="stat"><small>MOMENTUM TICK</small><b id="tickMomentum">—</b></div><div class="stat"><small>KONTEKS M15</small><b id="m15Direction">—</b></div><div class="stat"><small>KUALITAS DATA</small><b id="dataQuality">—</b></div></div><p id="intelligenceReason" class="note">Menunggu data M1, M5, M15, dan tick.</p><div class="divider"></div><div class="row"><b>JURNAL SINYAL</b><span id="journalSummary" class="muted">Belum ada catatan</span></div><p id="journalDetail" class="note">Hasil arah akan dievaluasi setelah 3 candle M1. Ini evaluasi arah harga, bukan keuntungan kontrak.</p></section><section class="panel"><b>KONTRAK YANG TERSEDIA</b><p id="contractInfo" class="note">Belum diperiksa.</p></section>
+<section class="panel" id="backtestPanel"><div class="row"><b>BACKTESTING HISTORIS</b><span id="btBadge" class="pill yellow">BELUM DIUJI</span></div><p class="note">Backtest membandingkan aturan lama, v9, v10, dan empat kandidat filter V11. Kandidat V11 hanya diuji di backtest; sinyal live tetap memakai aturan V10 sampai kandidat terbukti layak. Entry memakai open candle berikutnya agar tidak memakai harga masa depan.</p><div class="grid3"><div class="stat"><small>DATA M1</small><b>hingga 5.000 candle</b></div><div class="stat"><small>STOP LOSS</small><b>1,0 × ATR</b></div><div class="stat"><small>TARGET PROFIT</small><b>1,5 × ATR</b></div></div><p class="note">Data historis diminta hingga 5.000 candle M1, 1.200 M5, dan 500 M15 (jumlah aktual bergantung data yang tersedia). Maksimal 30 candle per transaksi. Jika SL dan TP tersentuh pada candle yang sama, dihitung SL lebih dulu. Spread, komisi, slippage, dan perbedaan harga MT5 belum dihitung.</p><button id="runBacktest" class="secondary" disabled>JALANKAN BACKTESTING</button><p id="btStatus" class="note">Hubungkan Deriv dan pilih instrumen untuk menjalankan backtesting.</p><div class="grid3"><div class="stat"><small>TRANSAKSI</small><b id="btTrades">—</b></div><div class="stat"><small>WIN RATE</small><b id="btWinRate">—</b></div><div class="stat"><small>PROFIT FACTOR</small><b id="btPF">—</b></div><div class="stat"><small>TP TERCAPAI</small><b id="btWins">—</b></div><div class="stat"><small>SL TERKENA</small><b id="btLosses">—</b></div><div class="stat"><small>HASIL BERSIH</small><b id="btNetR">—</b></div></div><p id="btDetail" class="note">Belum ada hasil. Tiga strategi dibandingkan dengan SL/TP dan periode yang sama: aturan lama, v9 ketat, dan v10 seimbang.</p><div class="divider"></div><b>BEDAH TRANSAKSI V10</b><p class="note">Menampilkan kelompok transaksi berdasarkan arah, kekuatan skor, dan konteks M5. Ini membantu menemukan sumber SL; kelompok kecil belum cukup untuk kesimpulan.</p><p id="btDiagnostics" class="note">Jalankan backtest untuk melihat rincian transaksi menang dan kalah.</p><div class="divider"></div><b>LAB KANDIDAT V11 — BELUM AKTIF UNTUK SINYAL LIVE</b><p class="note">Menguji empat filter pada sinyal V10 yang sama: skor minimal 80, kondisi M5 tidak datar, M5 searah, serta BUY/SELL searah secara terpisah. Setiap kandidat memakai simulasi entry, SL/TP, dan batas transaksi yang sama. Kandidat dengan sampel kecil tidak boleh langsung dipilih.</p><p id="v11Lab" class="note">Hasil kandidat V11 akan muncul setelah backtest.</p><div class="divider"></div><b>LAB DIAGNOSTIK V12 — KHUSUS SELL 80+ (BELUM AKTIF LIVE)</b><p class="note">Memecah transaksi SELL skor 80+ berdasarkan skor lebih rinci, arah M15, dan bentuk candle sinyal. Ini hanya diagnosis kelompok dari transaksi V10, bukan filter live atau bukti strategi profit.</p><p id="v12Lab" class="note">Jalankan backtest untuk melihat bedah SELL 80+.</p><div class="divider"></div><b>LAB KANDIDAT V13 — KOMBINASI SELL & DIAGNOSIS BUY (BELUM AKTIF LIVE)</b><p class="note">Menguji SELL skor 85–89 sebagai dasar, lalu membandingkannya dengan tambahan body candle &gt;70%, M15 searah, dan kombinasi keduanya. BUY dibedah terpisah berdasarkan skor, M5, M15, dan body candle. Hasil ini hanya memakai transaksi V10 yang sudah disimulasikan dengan aturan entry/SL/TP sama; tidak mengubah sinyal live.</p><p id="v13Lab" class="note">Jalankan backtest untuk melihat kandidat V13.</p><div class="divider"></div><b>V14 — VALIDASI KRONOLOGIS 60/40 (OUT-OF-SAMPLE)</b><p class="note">Data dibagi berdasarkan waktu: 60% periode awal untuk memilih kandidat, 40% periode akhir untuk menguji ulang tanpa dipakai memilih. Kandidat tidak mengubah sinyal live. Kandidat yang tampak bagus di data awal tetapi gagal di periode akhir dianggap belum tervalidasi. Sampel kandidat berasal dari sinyal V10 yang sama dan tetap memakai entry open candle berikutnya, SL 1 ATR, TP 1,5 ATR, maksimal 30 candle.</p><p id="v14Lab" class="note">Jalankan backtest untuk melihat hasil seleksi dan pengujian out-of-sample.</p></section>
+<section class="panel"><div class="row"><b>DIAGNOSTIK SISTEM</b><button id="clearLog" class="secondary" style="width:auto;margin:0">BERSIHKAN</button></div><div id="log" class="log">Aplikasi siap. Tekan HUBUNGKAN.</div></section>
+<footer>Versi eksperimen v11 ini hanya membaca data publik Deriv. Tidak login, tidak membaca saldo, tidak memasang transaksi, dan tidak menjalankan auto-trading. Sinyal bersifat edukatif; uji di akun demo dan jangan menganggapnya sebagai kepastian hasil.</footer>
+</main>
+<script>
+'use strict';
+const ENDPOINT='wss://api.derivws.com/trading/v1/options/ws/public';
+const $=id=>document.getElementById(id);
+let ws=null,req=0,pending=new Map(),symbols=[],candles=[],tickSub=null,loadToken=0,scannerTimer=null,lastScannedMinute=0,selectedMarketSymbol="",lastAnalysis=null,scanBusy=false,lastEvaluatedM1Epoch=0,latestTickPrice=null,latestTickEpoch=0,tickSamples=[],lastJournalEpoch=0,journal=loadJournal();
+function log(s){const t=new Date().toLocaleTimeString('id-ID');$('log').textContent=`[${t}] ${s}\n`+$('log').textContent;}
+function setStatus(on,msg){$('badge').textContent=on?'ONLINE':'OFFLINE';$('badge').className='pill '+(on?'green':'red');$('connectionText').textContent=on?'Tersambung':'Terputus';$('statusMessage').textContent=msg;$('connect').disabled=on;$('disconnect').disabled=!on;}
+function safeText(v){return typeof v==='string'?v.trim():typeof v==='number'?String(v):'';}
+function normalizeSymbol(raw){if(!raw||typeof raw!=='object')return null;const code=safeText(raw.underlying_symbol)||safeText(raw.symbol);if(!code)return null;const name=safeText(raw.underlying_symbol_name)||safeText(raw.display_name)||code;const fields=[raw.market,raw.submarket,raw.subgroup,raw.underlying_symbol_type,raw.symbol_type,raw.market_display_name,raw.submarket_display_name,name,code].map(safeText).filter(Boolean);return {...raw,code,name,marketText:fields.join(' ').toLowerCase()};}
+function category(s){const v=s.marketText||'';if(/forex|currency|major.?pairs|minor.?pairs/.test(v))return 'forex';if(/crypto|cryptocurrency|bitcoin|ethereum/.test(v))return 'crypto';if(/synthetic|derived|random.?index|continuous.?index|volatility|boom|crash|step.?index|jump.?index|drift.?switch|range.?break|1hz/.test(v))return 'synthetic';return 'other';}
+function visibleSymbols(){const f=$('market').value;return symbols.filter(s=>f==='all'||category(s)===f).slice().sort((a,b)=>String(a.name||a.code||'').localeCompare(String(b.name||b.code||''),undefined,{sensitivity:'base'}));}
+function enableDataButtons(v){$('load').disabled=!v;$('live').disabled=!v;$('checkContracts').disabled=!v;$('runBacktest').disabled=!v;}
+function renderSymbols(){const sel=$('symbol'),old=sel.value,list=visibleSymbols();sel.replaceChildren();if(!list.length){sel.add(new Option(symbols.length?'Tidak ada instrumen pada kategori ini':'Daftar instrumen belum diterima',''));sel.disabled=true;enableDataButtons(false);$('selectedName').textContent='Belum dipilih';return;}for(const s of list)sel.add(new Option(`${s.name} (${s.code})`,s.code));sel.disabled=false;if(list.some(s=>s.code===old))sel.value=old;enableDataButtons(true);updateSelected();}
+function updateSelected(){const s=symbols.find(x=>x.code===$('symbol').value);$('selectedName').textContent=s?s.name:'Belum dipilih';}
+function request(payload,timeout=15000){return new Promise((resolve,reject)=>{if(!ws||ws.readyState!==WebSocket.OPEN)return reject(Error('WebSocket belum siap'));const id=++req;const timer=setTimeout(()=>{pending.delete(id);reject(Error('Server tidak merespons dalam 15 detik'));},timeout);pending.set(id,{resolve,reject,timer});try{ws.send(JSON.stringify({...payload,req_id:id}));}catch(e){clearTimeout(timer);pending.delete(id);reject(e);}});}
+async function connect(){if(ws&&(ws.readyState===WebSocket.OPEN||ws.readyState===WebSocket.CONNECTING))return;setStatus(false,'Membuka koneksi pasar publik Deriv...');log('Membuka koneksi WebSocket publik.');try{ws=new WebSocket(ENDPOINT);}catch(e){setStatus(false,e.message);log('Gagal membuat WebSocket: '+e.message);return;}ws.onopen=async()=>{setStatus(true,'Terhubung. Memuat daftar instrumen...');log('WebSocket tersambung.');try{const r=await request({active_symbols:'full'});const arr=Array.isArray(r.active_symbols)?r.active_symbols:[];symbols=arr.map(normalizeSymbol).filter(Boolean);if(!symbols.length)throw Error('Respons aktif tetapi daftar instrumen kosong/tidak dikenali.');renderSymbols();const counts={forex:symbols.filter(s=>category(s)==='forex').length,synthetic:symbols.filter(s=>category(s)==='synthetic').length,crypto:symbols.filter(s=>category(s)==='crypto').length};log(`${symbols.length} instrumen diterima. Forex ${counts.forex}, Synthetic ${counts.synthetic}, Crypto ${counts.crypto}.`);setStatus(true,`${symbols.length} instrumen dimuat. Pilih instrumen untuk analisis.`);}catch(e){setStatus(true,'Koneksi aktif, daftar instrumen gagal dimuat: '+e.message);log('GAGAL MEMUAT INSTRUMEN: '+e.message);}};
+ws.onmessage=ev=>{let d;try{d=JSON.parse(ev.data);}catch{log('Respons server bukan JSON valid.');return;}if(d.req_id&&pending.has(d.req_id)){const p=pending.get(d.req_id);clearTimeout(p.timer);pending.delete(d.req_id);if(d.error)p.reject(Error(d.error.message||'API error'));else p.resolve(d);}if(d.error){log('API ERROR: '+(d.error.message||JSON.stringify(d.error)));return;}if(d.msg_type==='tick'&&d.tick){const t=d.tick;latestTickPrice=Number(t.quote);latestTickEpoch=Number(t.epoch);if(Number.isFinite(latestTickPrice)){tickSamples.push({price:latestTickPrice,epoch:latestTickEpoch});if(tickSamples.length>24)tickSamples.shift();}updateTickMomentum();$('price').textContent=latestTickPrice.toLocaleString('en-US',{maximumFractionDigits:8});$('tickTime').textContent='Waktu server: '+new Date(latestTickEpoch*1000).toLocaleString('id-ID');refreshEntryStatus();if(scannerTimer){const minute=Math.floor(Number(t.epoch)/60);if(minute>lastScannedMinute){lastScannedMinute=minute;autoScan();}}}if(d.msg_type==='candles'&&Array.isArray(d.candles)){candles=d.candles;drawChart();$('candleCount').textContent=candles.length+' candle';}};
+ws.onerror=()=>log('WebSocket mengalami error. Periksa jaringan.');ws.onclose=()=>{stopScanner();log('WebSocket ditutup.');for(const p of pending.values()){clearTimeout(p.timer);p.reject(Error('Koneksi terputus'));}pending.clear();ws=null;tickSub=null;setStatus(false,'Koneksi terputus. Tekan HUBUNGKAN untuk mencoba lagi.');};}
+function disconnect(){if(ws)ws.close();}
+async function getCandles(symbol,granularity,count=120){const r=await request({ticks_history:symbol,count,end:'latest',style:'candles',granularity});if(!Array.isArray(r.candles))throw Error(`Data candle ${granularity/60} menit tidak tersedia.`);return r.candles.map(c=>({epoch:Number(c.epoch),open:Number(c.open),high:Number(c.high),low:Number(c.low),close:Number(c.close)})).filter(c=>Number.isFinite(c.epoch)&&[c.open,c.high,c.low,c.close].every(Number.isFinite)).sort((a,b)=>a.epoch-b.epoch);}
+function closedCandles(list,granularity){const now=latestTickEpoch||Math.floor(Date.now()/1000);return list.filter(c=>c.epoch+granularity<=now);}
+const JOURNAL_KEY='DERIV_AI_BOT_V5_JOURNAL';
+function loadJournal(){try{const x=JSON.parse(localStorage.getItem(JOURNAL_KEY)||'[]');return Array.isArray(x)?x.slice(-300):[];}catch{return [];}}
+function saveJournal(){try{localStorage.setItem(JOURNAL_KEY,JSON.stringify(journal.slice(-300)));}catch(e){log('Jurnal tidak dapat disimpan di browser: '+e.message);}}
+function updateJournal(m1,side,score,signal,atr){
+ const last=m1[m1.length-1];if(!last)return;
+ for(const item of journal){if(item.result===null&&item.symbol===$('symbol').value){const future=m1.find(c=>c.epoch>=item.epoch+180);if(future){const delta=future.close-item.entry;const favorable=item.side==='BUY'?delta:-delta;item.exit=future.close;item.result=favorable>0?'SESUAI':'BERLAWAN';item.move=delta;item.evaluatedAt=future.epoch;}}}
+ if(last.epoch!==lastJournalEpoch){
+  if(signal==='BUY'||signal==='SELL')journal.push({symbol:$('symbol').value,epoch:last.epoch,side:signal,kind:'SIGNAL',entry:last.close,atr:atr||0,result:null});
+  else if(side&&score>=48)journal.push({symbol:$('symbol').value,epoch:last.epoch,side,kind:'POTENSI_TERLEWAT',entry:last.close,atr:atr||0,score,result:null});
+  lastJournalEpoch=last.epoch;saveJournal();
+ }
+ const done=journal.filter(x=>x.symbol===$('symbol').value&&x.result);const good=done.filter(x=>x.result==='SESUAI').length;const sig=done.filter(x=>x.kind==='SIGNAL');const sigGood=sig.filter(x=>x.result==='SESUAI').length;const missed=done.filter(x=>x.kind==='POTENSI_TERLEWAT'&&x.atr>0&&((x.side==='BUY'?x.exit-x.entry:x.entry-x.exit)>=x.atr*.8)).length;
+ $('journalSummary').textContent=`${sig.length} sinyal diuji · ${sig.length?Math.round(sigGood/sig.length*100):0}% searah · ${missed} potensi terlewat`;
+ $('journalDetail').textContent=`Evaluasi arah setelah 3 candle: ${good}/${done.length} catatan bergerak sesuai arah. Bukan win rate kontrak atau jaminan profit. Catatan tersimpan di browser ini.`;
+}
+function updateTickMomentum(){const el=$('tickMomentum');if(tickSamples.length<6){el.textContent='DATA KURANG';return;}const first=tickSamples[Math.max(0,tickSamples.length-8)].price,last=tickSamples[tickSamples.length-1].price;const delta=last-first;el.textContent=delta>0?'NAIK':delta<0?'TURUN':'DATAR';el.className=delta>0?'green':delta<0?'red':'yellow';}
+function detectBreakout(m1,side){if(m1.length<12)return false;const last=m1[m1.length-1],prior=m1.slice(-11,-1);return side==='BUY'?last.close>Math.max(...prior.map(c=>c.high)):last.close<Math.min(...prior.map(c=>c.low));}
+function detectReentry(a,side){if(!a.ready)return false;const near=Math.abs(a.last.close-a.e9)<=Math.max(a.last.high-a.last.low,1e-12)*.35;return near&&(side==='BUY'?a.e9>a.e21&&a.last.close>=a.last.open:a.e9<a.e21&&a.last.close<=a.last.open);}
+function inspectData(m1,m5,m15){const gaps=(list,limit)=>{let n=0;for(let i=1;i<list.length;i++)if(list[i].epoch-list[i-1].epoch>limit)n++;return n;};const valid=m1.length>=35&&m5.length>=35;const gapCount=gaps(m1,90)+gaps(m5,390);return {valid,gapCount,ok:valid&&gapCount===0,m15Ready:m15.length>=35};}
+function earlyWarning(buy,sell){const best=Math.max(buy.score,sell.score),diff=Math.abs(buy.score-sell.score);if(best<48||diff<7)return 'BELUM ADA';return buy.score>sell.score?'EARLY BUY':'EARLY SELL';}
+async function loadAnalysis(){const symbol=$('symbol').value;if(!symbol)return;const token=++loadToken;$('candleStatus').textContent='Mengambil data M1 dan M5...';$('signal').textContent='MEMERIKSA M1 + M5';$('signal').className='signal yellow';$('analysisBadge').textContent='MEMUAT DATA';$('analysisBadge').className='pill yellow';try{const [m1raw,m5raw,m15raw]=await Promise.all([getCandles(symbol,60,160),getCandles(symbol,300,160),getCandles(symbol,900,120)]);if(token!==loadToken)return;const m1=closedCandles(m1raw,60),m5=closedCandles(m5raw,300),m15=closedCandles(m15raw,900);candles= $('tf').value==='60'?m1raw:$('tf').value==='300'?m5raw:await getCandles(symbol,Number($('tf').value),100);drawChart();$('candleCount').textContent=candles.length+' candle';$('candleStatus').textContent=`Grafik ${$('tf').selectedOptions[0].text}: ${candles.length} candle. Analisis memakai candle M1 dan M5 yang sudah selesai.`;evaluateDual(m1,m5,m15);log(`Analisis ${symbol}: ${m1.length} candle M1, ${m5.length} candle M5, ${m15.length} candle M15 tertutup.`);}catch(e){if(token!==loadToken)return;$('signal').textContent='DATA BELUM CUKUP';$('signal').className='signal yellow';$('analysisBadge').textContent='GAGAL';$('reason').textContent=e.message;$('candleStatus').textContent=e.message;log('ANALISIS ERROR: '+e.message);}}
+async function startLive(){const s=$('symbol').value;if(!s)return;try{if(tickSub){try{await request({forget:tickSub});}catch{}tickSub=null;}const r=await request({ticks:s,subscribe:1});tickSub=r.subscription&&r.subscription.id?r.subscription.id:null;log('Stream harga aktif: '+s);}catch(e){log('LIVE ERROR: '+e.message);}}
+async function checkContracts(){const s=$('symbol').value;if(!s)return;$('contractInfo').textContent='Memeriksa kontrak...';try{const r=await request({contracts_for:s});const list=r.contracts_for&&Array.isArray(r.contracts_for.available)?r.contracts_for.available:[];const types=[...new Set(list.map(x=>safeText(x.contract_type)).filter(Boolean))].sort();$('contractInfo').textContent=types.length?'Jenis kontrak yang terdeteksi: '+types.join(', ')+'. Rise/Fall CALL dan PUT: '+(types.includes('CALL')&&types.includes('PUT')?'terdeteksi':'tidak lengkap/tidak tersedia')+'. Multipliers MULTUP dan MULTDOWN: '+(types.includes('MULTUP')&&types.includes('MULTDOWN')?'terdeteksi':'tidak lengkap/tidak tersedia')+'.':'Tidak ada kontrak yang dikembalikan untuk instrumen ini.';log('Pemeriksaan kontrak selesai: '+s+'.');}catch(e){$('contractInfo').textContent=e.message;log('KONTRAK ERROR: '+e.message);}}
+function ema(values,period){if(values.length<period)return null;const k=2/(period+1);let v=values.slice(0,period).reduce((a,b)=>a+b,0)/period;for(let i=period;i<values.length;i++)v=values[i]*k+v*(1-k);return v;}
+function calcRsi(values,period=14){if(values.length<=period)return null;let gain=0,loss=0;for(let i=values.length-period;i<values.length;i++){const d=values[i]-values[i-1];if(d>0)gain+=d;else loss-=d;}if(loss===0)return gain===0?50:100;if(gain===0)return 0;const rs=(gain/period)/(loss/period);return 100-100/(1+rs);}
+function assess(list){if(list.length<35)return {ready:false,count:list.length};const closes=list.map(c=>c.close),e9=ema(closes,9),e21=ema(closes,21),rsi=calcRsi(closes,14),last=list[list.length-1],prev=list[list.length-2],prior=list[list.length-4];let dir='SIDEWAYS';if(e9>e21&&last.close>e9)dir='UP';if(e9<e21&&last.close<e9)dir='DOWN';const candle=last.close>last.open?'UP':last.close<last.open?'DOWN':'FLAT';const previous=prev.close>prev.open?'UP':prev.close<prev.open?'DOWN':'FLAT';const slope=last.close>prior.close?'UP':last.close<prior.close?'DOWN':'FLAT';const atr=calcAtr(list);return {ready:true,count:list.length,e9,e21,rsi,last,prev,dir,candle,previous,slope,atr};}
+function scoreDirection(m1,m5,dir){
+ const a=assess(m1),b=assess(m5); if(!a.ready||!b.ready)return {score:0,ready:false,reasons:[]};
+ let score=0,reasons=[]; const up=dir==='UP';
+ const alignedM5=b.dir===(up?'UP':'DOWN');
+ const alignedM1=a.dir===(up?'UP':'DOWN');
+ const candle=a.candle===(up?'UP':'DOWN');
+ const prev=a.previous===(up?'UP':'DOWN');
+ const m5Candle=b.candle===(up?'UP':'DOWN');
+ const emaGap=Math.abs(a.e9-a.e21)/(Math.abs(a.last.close)||1)*10000;
+ const recent=a.last.close-a.prev.close; const momentum=up?recent>0:recent<0;
+ const rsiOk=up?(a.rsi>=42&&a.rsi<=73):(a.rsi>=27&&a.rsi<=58);
+ const m5Counter=b.dir===(up?'DOWN':'UP');
+ // Konteks M5 diberi bobot, tetapi tidak mematikan peluang pembalikan M1.
+ if(alignedM5){score+=22;reasons.push('M5 searah');}
+ else if(m5Counter){score+=5;reasons.push('melawan arah M5');}
+ if(alignedM1){score+=18;reasons.push('EMA M1 mendukung');}
+ if(candle){score+=12;reasons.push('candle M1 searah');}
+ if(prev){score+=7;reasons.push('candle sebelumnya searah');}
+ if(momentum){score+=8;reasons.push('momentum terbaru mendukung');}
+ if(rsiOk){score+=10;reasons.push('RSI tidak ekstrem');}
+ if(m5Candle){score+=6;reasons.push('candle M5 mendukung');}
+ if(emaGap>0.015){score+=5;reasons.push('jarak EMA cukup');}
+ // Deteksi reversal dini: perubahan candle + RSI kembali melewati area tengah + harga kembali di sisi EMA9.
+ const reversal=up?(m5Counter&&a.candle==='UP'&&a.previous==='DOWN'&&a.last.close>a.e9&&a.rsi>38&&a.rsi<62):(m5Counter&&a.candle==='DOWN'&&a.previous==='UP'&&a.last.close<a.e9&&a.rsi>38&&a.rsi<62);
+ if(reversal){score+=20;reasons.push('pola pembalikan awal M1');}
+ // Kurangi skor saat RSI sangat jenuh atau candle terlalu kecil/tidak meyakinkan.
+ if(up&&a.rsi>76||!up&&a.rsi<24){score-=18;reasons.push('RSI terlalu ekstrem');}
+ const body=Math.abs(a.last.close-a.last.open),range=Math.max(a.last.high-a.last.low,1e-12);
+ if(body/range<0.12){score-=8;reasons.push('badan candle sangat kecil');}
+ return {score:Math.max(0,Math.min(100,Math.round(score))),ready:true,reasons,a,b,reversal};
+}
+function historicalCheck(m1,m5){
+ // Walk-forward sederhana: skor dihitung hanya dari candle sebelum hasil 3 candle berikutnya diketahui.
+ let n=0,w=0; const start=Math.max(40,m1.length-220);
+ for(let i=start;i<m1.length-3;i++){
+  const t=m1[i].epoch+60; let j=-1; for(let k=0;k<m5.length;k++){if(m5[k].epoch+300<=t)j=k;else break;}
+  if(j<35)continue;
+  const x=scoreDirection(m1.slice(0,i+1),m5.slice(0,j+1),'UP');
+  const y=scoreDirection(m1.slice(0,i+1),m5.slice(0,j+1),'DOWN');
+  let dir='',sc=0;if(x.score>=72&&x.score>y.score){dir='UP';sc=x.score;}else if(y.score>=72&&y.score>x.score){dir='DOWN';sc=y.score;}
+  if(!dir)continue; const entry=m1[i].close,exit=m1[i+3].close; if(!Number.isFinite(entry)||!Number.isFinite(exit)||entry===exit)continue;
+  n++;if((dir==='UP'&&exit>entry)||(dir==='DOWN'&&exit<entry))w++;
+ }
+ return n>=8?`${Math.round(w/n*100)}% (${w}/${n})`:`Sampel ${n}/8`;
+}
+function calcAtr(list,period=14){if(list.length<period+1)return null;let sum=0;for(let i=list.length-period;i<list.length;i++){const c=list[i],prev=list[i-1];sum+=Math.max(c.high-c.low,Math.abs(c.high-prev.close),Math.abs(c.low-prev.close));}return sum/period;}
+function btcFastSetup(a,b,dir,score){
+ if(!a.ready||!b.ready)return false;
+ const up=dir==='UP',last=a.last,prev=a.prev;
+ const body=Math.abs(last.close-last.open),range=Math.max(last.high-last.low,1e-12),bodyRatio=body/range;
+ const candle=up?last.close>last.open:last.close<last.open;
+ const previous=up?a.previous==='UP':a.previous==='DOWN';
+ const priceSide=up?last.close>a.e9:last.close<a.e9;
+ const emaOrder=up?a.e9>a.e21:a.e9<a.e21;
+ const rsiOk=up?(a.rsi>=32&&a.rsi<=70):(a.rsi>=30&&a.rsi<=68);
+ const breakout=up?last.close>prev.high:last.close<prev.low;
+ const m5Aligned=b.dir===(up?'UP':'DOWN');
+ const m1Momentum=up?last.close>prev.close:last.close<prev.close;
+ const m1Slope=up?a.slope==='UP':a.slope==='DOWN';
+ // M1 boleh mengonfirmasi kelanjutan tren sendiri: dua candle searah + slope M1,
+ // sehingga tidak harus menunggu M5 atau breakout baru. Filter inti tetap wajib.
+ const m1Continuation=previous&&m1Momentum&&m1Slope;
+ return score>=58&&candle&&priceSide&&emaOrder&&rsiOk&&bodyRatio>=0.18&&(m5Aligned||breakout||m1Continuation);
+}
+function strictEntryFilter(a,b,side){
+ if(!a.ready||!b.ready)return false;
+ const up=side==='BUY',last=a.last,prev=a.prev;
+ const atr=calcAtrFromAssess(a);if(!atr||atr<=0)return false;
+ const range=Math.max(last.high-last.low,1e-12),body=Math.abs(last.close-last.open),bodyRatio=body/range;
+ const closePos=(last.close-last.low)/range;
+ const closeStrong=up?closePos>=0.70:closePos<=0.30;
+ const againstWick=up?(Math.min(last.open,last.close)-last.low)/range:(last.high-Math.max(last.open,last.close))/range;
+ const candle=up?last.close>last.open:last.close<last.open;
+ const previous=up?prev.close>prev.open:prev.close<prev.open;
+ const emaAligned=up?(a.e9>a.e21&&last.close>a.e9):(a.e9<a.e21&&last.close<a.e9);
+ const momentum=up?last.close>prev.close:last.close<prev.close;
+ const breakout=up?last.close>prev.high:last.close<prev.low;
+ const rsiOk=up?(a.rsi>=48&&a.rsi<=68):(a.rsi>=32&&a.rsi<=52);
+ const notChasing=Math.abs(last.close-a.e9)<=atr*0.75;
+ // Counter-trend M5 ditahan. Jika M5 datar, wajib ada dua candle searah dan breakout.
+ const m5Ok=b.dir===(up?'UP':'DOWN')||(b.dir==='SIDEWAYS'&&previous&&candle&&breakout);
+ return candle&&previous&&momentum&&emaAligned&&bodyRatio>=0.32&&closeStrong&&againstWick<=0.30&&rsiOk&&notChasing&&m5Ok;
+}
+function calcAtrFromAssess(a){
+ if(!a||!a.ready)return null;
+ // ATR dihitung dari candle yang tersedia pada objek penilaian.
+ return Number(a.atr)||null;
+}
+function balancedEntryFilter(a,b,side,score){
+ if(!a.ready||!b.ready)return false;
+ const up=side==='BUY',last=a.last,prev=a.prev,atr=Number(a.atr)||0;
+ if(!atr||atr<=0)return false;
+ const range=Math.max(last.high-last.low,1e-12),body=Math.abs(last.close-last.open),bodyRatio=body/range;
+ const closePos=(last.close-last.low)/range;
+ const candle=up?last.close>last.open:last.close<last.open;
+ const momentum=up?last.close>prev.close:last.close<prev.close;
+ const priceSide=up?last.close>a.e9:last.close<a.e9;
+ const emaAligned=up?a.e9>a.e21:a.e9<a.e21;
+ const reversal=up?(a.previous==='DOWN'&&candle&&priceSide&&a.rsi>=40&&a.rsi<=66):(a.previous==='UP'&&candle&&priceSide&&a.rsi>=34&&a.rsi<=60);
+ const rsiOk=up?(a.rsi>=36&&a.rsi<=74):(a.rsi>=26&&a.rsi<=64);
+ const notChasing=Math.abs(last.close-a.e9)<=atr*1.10;
+ const closeStrong=up?closePos>=0.54:closePos<=0.46;
+ const m5Aligned=b.dir===(up?'UP':'DOWN'),m5Sideways=b.dir==='SIDEWAYS';
+ // Counter-trend M5 hanya boleh dilawan bila ada pola reversal M1 yang jelas dan skor lebih kuat.
+ const contextOk=m5Aligned||m5Sideways||(reversal&&score>=68);
+ return candle&&momentum&&priceSide&&rsiOk&&notChasing&&closeStrong&&bodyRatio>=0.18&&(emaAligned||reversal)&&contextOk;
+}
+function clearTradePlan(status='MENUNGGU'){
+ for(const id of ['planEntry','planSL','planTP1','planTP2','planRisk'])$(id).textContent='—';
+ $('planStatus').textContent=status;
+}
+function setTradePlan(side,entry,atr,status='AKTIF'){
+ if(!Number.isFinite(entry)||!Number.isFinite(atr)||atr<=0){clearTradePlan('DATA ATR TIDAK CUKUP');return;}
+ const buy=side==='BUY',sl=entry+(buy?-1:1)*atr,tp1=entry+(buy?1:-1)*atr*1.5,tp2=entry+(buy?1:-1)*atr*2.5;
+ $('planEntry').textContent=fmt(entry);$('planSL').textContent=fmt(sl);$('planTP1').textContent=fmt(tp1);$('planTP2').textContent=fmt(tp2);$('planRisk').textContent=fmt(atr);$('planStatus').textContent=status;
+}
+function refreshEntryStatus(){
+ if(!lastAnalysis||!lastAnalysis.signal||lastAnalysis.signal==='WAIT'||lastAnalysis.terminalState)return;
+ const age=latestTickEpoch?latestTickEpoch-(lastAnalysis.m1Epoch+60):0;if(age<0)return;
+ const side=lastAnalysis.signal;
+ const signedMove=latestTickPrice!==null?(side==='SELL'?lastAnalysis.referencePrice-latestTickPrice:latestTickPrice-lastAnalysis.referencePrice):0;
+ const adverseMove=latestTickPrice!==null?(side==='SELL'?latestTickPrice-lastAnalysis.referencePrice:lastAnalysis.referencePrice-latestTickPrice):0;
+ const atr=Number(lastAnalysis.atr)||0;
+ let state='AKTIF',message='Sinyal masih dipantau. Cocokkan harga dengan MT5 sebelum entry.';
+ if(atr>0&&signedMove>=atr*0.45){state='TERLEWAT';message='Harga sudah bergerak jauh searah sinyal. Jangan mengejar harga; tunggu sinyal baru.';}
+ else if(atr>0&&adverseMove>=atr*0.22){state='BATAL';message='Harga bergerak berlawanan. Sinyal dibatalkan lebih awal; jangan entry berdasarkan sinyal ini.';}
+ else if(atr>0&&adverseMove>=atr*0.12){state='WASPADA';message='Harga mulai bergerak melawan sinyal. Jangan entry dulu; tunggu kondisi kembali jelas atau sinyal baru.';}
+ if(state==='BATAL'||state==='TERLEWAT'){
+  lastAnalysis.terminalState=state;setTradePlan(side,lastAnalysis.referencePrice,atr,state+' · JANGAN ENTRY');$('signal').textContent=state;$('signal').className='signal yellow';$('analysisBadge').textContent=state;$('analysisBadge').className='pill yellow';$('reason').textContent=message;
+ }else if(state==='WASPADA'){
+  setTradePlan(side,lastAnalysis.referencePrice,atr,'WASPADA · TUNGGU');lastAnalysis.warningState=true;$('signal').textContent='WASPADA';$('signal').className='signal yellow';$('analysisBadge').textContent='WASPADA';$('analysisBadge').className='pill yellow';$('reason').textContent=message;
+ }else if(lastAnalysis.warningState&&adverseMove<atr*0.06){
+  setTradePlan(side,lastAnalysis.referencePrice,atr,'AKTIF');lastAnalysis.warningState=false;$('signal').textContent=side;$('signal').className='signal '+(side==='BUY'?'green':'red');$('analysisBadge').textContent=side+' AKTIF';$('analysisBadge').className='pill '+(side==='BUY'?'green':'red');$('reason').textContent='Tekanan berlawanan mereda, tetapi sinyal tetap perlu dicocokkan dengan harga MT5.';
+ }else if($('signal').textContent===side||$('signal').textContent==='PELUANG '+side){$('reason').textContent=message;}
+}
+function evaluateDual(m1,m5,m15=[]){
+ const a=assess(m1),b=assess(m5),c=assess(m15);
+ if(!a.ready||!b.ready){$('signal').textContent='MENUNGGU DATA';$('signal').className='signal yellow';$('analysisBadge').textContent='DATA KURANG';$('analysisBadge').className='pill yellow';$('reason').textContent=`Dibutuhkan minimal 35 candle tertutup pada M1 dan M5. Saat ini M1: ${a.count}, M5: ${b.count}.`;return;}
+ $('emaFast').textContent=fmt(a.e9);$('emaSlow').textContent=fmt(a.e21);$('rsi').textContent=a.rsi.toFixed(1);
+ $('m5Direction').textContent=b.dir==='UP'?'NAIK':b.dir==='DOWN'?'TURUN':'DATAR';$('m5Direction').className=b.dir==='UP'?'green':b.dir==='DOWN'?'red':'yellow';$('m5Details').textContent=`EMA9 ${fmt(b.e9)} · EMA21 ${fmt(b.e21)} · candle ${b.candle==='UP'?'naik':b.candle==='DOWN'?'turun':'datar'}`;
+ $('m1Direction').textContent=a.dir==='UP'?'NAIK':a.dir==='DOWN'?'TURUN':'DATAR';$('m1Direction').className=a.dir==='UP'?'green':a.dir==='DOWN'?'red':'yellow';$('m1Details').textContent=`Candle terakhir ${a.candle==='UP'?'naik':a.candle==='DOWN'?'turun':'datar'} · RSI ${a.rsi.toFixed(1)}`;
+ const buy=scoreDirection(m1,m5,'UP'),sell=scoreDirection(m1,m5,'DOWN');if(c.ready&&c.dir==='UP')buy.score=Math.min(100,buy.score+4);else if(c.ready&&c.dir==='DOWN')sell.score=Math.min(100,sell.score+4);$('buyScore').textContent=buy.score+'/100';$('sellScore').textContent=sell.score+'/100';$('validation').textContent=historicalCheck(m1,m5);
+ const selected=symbols.find(x=>x.code===$('symbol').value);const identity=[$('symbol').value,selected&&selected.name,$('symbol').selectedOptions[0]&&$('symbol').selectedOptions[0].text].filter(Boolean).join(' ');const isBtcM1=/BTC|BITCOIN/i.test(identity)&&$('tf').value==='60';
+ const balancedBuy=buy.score>=62&&buy.score>=sell.score+5&&balancedEntryFilter(a,b,'BUY',buy.score);
+ const balancedSell=sell.score>=62&&sell.score>=buy.score+5&&balancedEntryFilter(a,b,'SELL',sell.score);
+ let signal='WAIT',cls='yellow',badge='WAIT',why='Belum ada peluang entry yang lolos pemeriksaan seimbang. Bot tetap mencari peluang berikutnya.';
+ if(balancedSell){signal=isBtcM1?'SELL':'PELUANG SELL';cls='red';badge=signal;why='Peluang SELL lolos filter seimbang: candle dan momentum turun, harga belum terlalu jauh, serta konteks pasar masih dapat diterima. Cocokkan harga MT5 sebelum entry.';}
+ else if(balancedBuy){signal=isBtcM1?'BUY':'PELUANG BUY';cls='green';badge=signal;why='Peluang BUY lolos filter seimbang: candle dan momentum naik, harga belum terlalu jauh, serta konteks pasar masih dapat diterima. Cocokkan harga MT5 sebelum entry.';}
+ const early=earlyWarning(buy,sell);$('earlySignal').textContent=early;$('earlySignal').className=early.includes('BUY')?'green':early.includes('SELL')?'red':'yellow';
+ const breakout=detectBreakout(m1,buy.score>sell.score?'BUY':'SELL');$('breakoutState').textContent=breakout?(buy.score>sell.score?'BREAKOUT NAIK':'BREAKOUT TURUN'):'BELUM';$('breakoutState').className=breakout?(buy.score>sell.score?'green':'red'):'yellow';
+ const reBuy=detectReentry(a,'BUY'),reSell=detectReentry(a,'SELL');const reentry=reBuy?'BUY':reSell?'SELL':'BELUM';$('reentryState').textContent=reentry;$('reentryState').className=reentry==='BUY'?'green':reentry==='SELL'?'red':'yellow';
+ $('m15Direction').textContent=c.ready?(c.dir==='UP'?'NAIK':c.dir==='DOWN'?'TURUN':'DATAR'):'DATA KURANG';$('m15Direction').className=c.ready?(c.dir==='UP'?'green':c.dir==='DOWN'?'red':'yellow'):'yellow';
+ const health=inspectData(m1,m5,m15);$('healthBadge').textContent=health.ok?'DATA BAIK':health.valid?'ADA GAP DATA':'DATA KURANG';$('healthBadge').className='pill '+(health.ok?'green':'yellow');$('dataQuality').textContent=health.ok?(health.m15Ready?'BAIK':'M15 OPSIONAL') :health.valid?'PERIKSA GAP':'KURANG';
+ const tickDir=tickSamples.length>=6?($('tickMomentum').textContent):'belum tersedia';$('intelligenceReason').textContent=`Peringatan ${early.toLowerCase()}. M15 ${c.ready?c.dir:'belum cukup data (M15 hanya pendukung)'}. ${health.gapCount?health.gapCount+' celah candle terdeteksi.':'Tidak ditemukan celah candle besar pada data yang diperiksa.'} Momentum tick: ${tickDir}.`;
+ if(!health.ok&&signal!=='WAIT'){signal='WAIT';cls='yellow';badge='DATA PERLU DIPERIKSA';why='Sinyal ditahan karena data belum lengkap atau ada celah candle. Tunggu data stabil sebelum mempertimbangkan entry.';}
+ const incomingSide=signal.startsWith('PELUANG ')?signal.replace('PELUANG ',''):signal;
+ const prior=lastAnalysis&&lastAnalysis.symbol===$('symbol').value&&lastAnalysis.signal!=='WAIT'&&!lastAnalysis.terminalState?lastAnalysis:null;
+ // Jika candle baru hanya menghasilkan WAIT, pertahankan sinyal lama selama harga live belum membatalkannya/menjadikannya terlewat.
+ if(signal==='WAIT'&&prior){
+  signal=prior.signal;cls=prior.signal==='BUY'?'green':'red';badge=prior.signal+' DIPANTAU';
+  why='Analisis candle terbaru belum menemukan sinyal baru. Sinyal '+prior.signal+' sebelumnya masih dipantau; jangan entry jika harga MT5 sudah jauh berbeda dari harga acuan.';
+ }
+ $('signal').textContent=signal;$('signal').className='signal '+cls;$('analysisBadge').textContent=badge;$('analysisBadge').className='pill '+(cls==='yellow'?'yellow':cls);
+ $('reason').textContent=why;
+ if(incomingSide!=='WAIT'&&incomingSide!=='' ){
+  $('entryPrice').textContent=fmt(a.last.close);$('entryTime').textContent=new Date((a.last.epoch+60)*1000).toLocaleTimeString('id-ID');
+  lastAnalysis={symbol:$('symbol').value,m1Epoch:a.last.epoch,signal:incomingSide,buy:buy.score,sell:sell.score,referencePrice:a.last.close,atr:calcAtr(m1),fastBtc:isBtcM1};setTradePlan(incomingSide,a.last.close,calcAtr(m1),signal==='PELUANG BUY'||signal==='PELUANG SELL'?'PELUANG · TUNGGU KONFIRMASI MT5':'AKTIF · CEK HARGA MT5');
+ } else if(!prior){$('entryPrice').textContent='—';$('entryTime').textContent='—';clearTradePlan('MENUNGGU SINYAL');}
+ const candidate=buy.score>sell.score?'BUY':'SELL';updateJournal(m1,candidate,Math.max(buy.score,sell.score),incomingSide==='BUY'||incomingSide==='SELL'?incomingSide:'WAIT',calcAtr(m1));
+ lastEvaluatedM1Epoch=a.last.epoch;refreshEntryStatus();
+}
+function stopScanner(){if(scannerTimer){clearInterval(scannerTimer);scannerTimer=null;}$('scannerStatus').textContent='Pemindai otomatis OFF';$('scanToggle').textContent='MULAI PEMINDAI';$('scanToggle').className='secondary';}
+function startScanner(){if(!ws||ws.readyState!==WebSocket.OPEN||!$('symbol').value){log('Pilih instrumen dan hubungkan Deriv terlebih dahulu.');return;}if(scannerTimer)return;lastScannedMinute=Math.floor((latestTickEpoch||Math.floor(Date.now()/1000))/60);scannerTimer=setInterval(()=>{const minute=Math.floor((latestTickEpoch||Math.floor(Date.now()/1000))/60);if(minute>lastScannedMinute){lastScannedMinute=minute;autoScan();}},1000);$('scannerStatus').textContent='Pemindai aktif · memeriksa setiap candle M1 selesai';$('scanToggle').textContent='HENTIKAN PEMINDAI';$('scanToggle').className='';log('Pemindai peluang aktif. Pemeriksaan pertama dimulai sekarang.');autoScan();}
+async function autoScan(){if(!scannerTimer||scanBusy||!ws||ws.readyState!==WebSocket.OPEN||!$('symbol').value)return;scanBusy=true;try{const symbol=$('symbol').value;const [m1,m5,m15]=await Promise.all([getCandles(symbol,60,160),getCandles(symbol,300,160),getCandles(symbol,900,120)]);if(symbol!==$('symbol').value)return;const closed1=closedCandles(m1,60),closed5=closedCandles(m5,300),closed15=closedCandles(m15,900);if(!closed1.length||closed1[closed1.length-1].epoch<=lastEvaluatedM1Epoch){$('scannerStatus').textContent='Pemindai aktif · menunggu candle M1 berikutnya';return;}evaluateDual(closed1,closed5,closed15);$('scannerStatus').textContent='Pemindai aktif · diperbarui '+new Date().toLocaleTimeString('id-ID');log(`Pemindaian candle M1 baru selesai: ${symbol}.`);}catch(e){$('scannerStatus').textContent='Pemindai aktif · data belum tersedia';log('AUTO SCAN: '+e.message);}finally{scanBusy=false;}}
+function countGaps(list,limit){let n=0;for(let i=1;i<list.length;i++)if(list[i].epoch-list[i-1].epoch>limit)n++;return n;}
+function backtestSignalAt(m1,m5,m15,index,isBtcM1){
+ const t=m1[index].epoch+60;let j=-1,k=-1;
+ for(let x=0;x<m5.length&&m5[x].epoch+300<=t;x++)j=x;
+ for(let x=0;x<m15.length&&m15[x].epoch+900<=t;x++)k=x;
+ if(j<34)return null;
+ const one=m1.slice(0,index+1),five=m5.slice(0,j+1),fifteen=k>=0?m15.slice(0,k+1):[];
+ if(one.length<35||countGaps(one,90)>0||countGaps(five,390)>0)return null;
+ const a=assess(one),b=assess(five),c=assess(fifteen);if(!a.ready||!b.ready)return null;
+ const buy=scoreDirection(one,five,'UP'),sell=scoreDirection(one,five,'DOWN');
+ if(c.ready&&c.dir==='UP')buy.score=Math.min(100,buy.score+4);else if(c.ready&&c.dir==='DOWN')sell.score=Math.min(100,sell.score+4);
+ let base='';
+ if(isBtcM1&&btcFastSetup(a,b,'UP',buy.score))base='BUY';
+ else if(isBtcM1&&btcFastSetup(a,b,'DOWN',sell.score))base='SELL';
+ else if(buy.score>=72&&buy.score>=sell.score+7)base='BUY';
+ else if(sell.score>=72&&sell.score>=buy.score+7)base='SELL';
+ const v9=base&&strictEntryFilter(a,b,base)?base:'';
+ let v10='';
+ if(buy.score>=62&&buy.score>=sell.score+5&&balancedEntryFilter(a,b,'BUY',buy.score))v10='BUY';
+ else if(sell.score>=62&&sell.score>=buy.score+5&&balancedEntryFilter(a,b,'SELL',sell.score))v10='SELL';
+ const atr=a.atr;
+ if(!atr||!Number.isFinite(atr)||atr<=0)return null;
+ const chosen=v10==='BUY'?buy:v10==='SELL'?sell:null;const v10Meta=chosen?{v10Score:chosen.score,v10Rsi:a.rsi,v10BodyRatio:Math.abs(a.last.close-a.last.open)/Math.max(a.last.high-a.last.low,1e-12),v10M5:b.dir,v10M1:a.dir,v10M15:c.ready?c.dir:'UNKNOWN'}:null;
+ return {side:base,v9,v10,atr,score:Math.max(buy.score,sell.score),signalEpoch:m1[index].epoch,v10Meta};
+}
+function simulateBacktestTrade(m1,signalIndex,signal,slAtr=1,tpAtr=1.5,maxBars=30){
+ const entryIndex=signalIndex+1;if(entryIndex>=m1.length)return null;
+ const entry=m1[entryIndex].open;if(!Number.isFinite(entry)||entry<=0)return null;
+ const risk=signal.atr*slAtr,target=signal.atr*tpAtr;if(!Number.isFinite(risk)||risk<=0)return null;
+ const buy=signal.side==='BUY',sl=buy?entry-risk:entry+risk,tp=buy?entry+target:entry-target;
+ const end=Math.min(m1.length-1,entryIndex+maxBars-1);
+ for(let i=entryIndex;i<=end;i++){
+  const c=m1[i],hitSL=buy?c.low<=sl:c.high>=sl,hitTP=buy?c.high>=tp:c.low<=tp;
+  if(hitSL&&hitTP)return {outcome:'LOSS',r:-1,exit:sl,exitIndex:i,reason:'SL & TP satu candle; dihitung SL'};
+  if(hitSL)return {outcome:'LOSS',r:-1,exit:sl,exitIndex:i,reason:'SL'};
+  if(hitTP)return {outcome:'WIN',r:tpAtr/slAtr,exit:tp,exitIndex:i,reason:'TP'};
+ }
+ const last=m1[end],exit=last.close;const raw=buy?exit-entry:entry-exit;return {outcome:'TIME',r:raw/risk,exit,exitIndex:end,reason:'Batas 30 candle'};
+}
+function summarizeTrades(trades){
+ const wins=trades.filter(x=>x.r>0),losses=trades.filter(x=>x.r<0),grossWin=wins.reduce((a,x)=>a+x.r,0),grossLoss=Math.abs(losses.reduce((a,x)=>a+x.r,0));
+ let eq=0,peak=0,maxDD=0;for(const t of trades){eq+=t.r;peak=Math.max(peak,eq);maxDD=Math.max(maxDD,peak-eq);}
+ return {n:trades.length,wins:wins.length,losses:losses.length,winRate:trades.length?wins.length/trades.length*100:0,net:trades.reduce((a,x)=>a+x.r,0),pf:grossLoss?grossWin/grossLoss:(grossWin?Infinity:0),maxDD,tp:trades.filter(x=>x.outcome==='WIN').length,sl:trades.filter(x=>x.outcome==='LOSS').length,time:trades.filter(x=>x.outcome==='TIME').length};
+}
+function diagnosticGroup(trades,keyFn){
+ const keys=[...new Set(trades.map(keyFn))];return keys.map(key=>{const group=trades.filter(t=>keyFn(t)===key),wins=group.filter(t=>t.r>0),losses=group.filter(t=>t.r<0),gw=wins.reduce((a,t)=>a+t.r,0),gl=Math.abs(losses.reduce((a,t)=>a+t.r,0));return {key,n:group.length,wr:group.length?wins.length/group.length*100:0,pf:gl?gw/gl:(gw?Infinity:0),net:group.reduce((a,t)=>a+t.r,0),sl:group.filter(t=>t.outcome==='LOSS').length,tp:group.filter(t=>t.outcome==='WIN').length};});
+}
+function renderDiagnostics(trades){
+ if(!trades.length){$('btDiagnostics').textContent='Tidak ada transaksi V10 untuk dianalisis.';return;}
+ const side=diagnosticGroup(trades,t=>t.side),score=diagnosticGroup(trades,t=>t.v10Score<70?'Skor 62–69':t.v10Score<80?'Skor 70–79':'Skor 80+'),context=diagnosticGroup(trades,t=>t.v10M5==='UP'?(t.side==='BUY'?'M5 searah BUY':'M5 berlawanan SELL'):t.v10M5==='DOWN'?(t.side==='SELL'?'M5 searah SELL':'M5 berlawanan BUY'):'M5 datar');
+ const line=(title,arr)=>title+': '+arr.map(x=>`${x.key} ${x.n}x · WR ${x.wr.toFixed(1)}% · PF ${Number.isFinite(x.pf)?x.pf.toFixed(2):'∞'} · net ${x.net>0?'+':''}${x.net.toFixed(2)}R · SL ${x.sl}`).join(' | ');
+ $('btDiagnostics').textContent=[line('ARAH',side),line('SKOR',score),line('KONTEKS M5',context),'Catatan: PF dan win rate kelompok dengan sampel sedikit mudah berubah; jangan memilih filter hanya karena satu kelompok tampak bagus.'].join('\n');
+}
+function renderV14Validation(trades,splitEpoch,periodStart,periodEnd){
+ const defs=[
+  ['SELL skor 85–89',t=>t.side==='SELL'&&t.v10Score>=85&&t.v10Score<90],
+  ['SELL 85–89 + body >70%',t=>t.side==='SELL'&&t.v10Score>=85&&t.v10Score<90&&t.v10BodyRatio>0.70],
+  ['SELL 85–89 + M15 searah',t=>t.side==='SELL'&&t.v10Score>=85&&t.v10Score<90&&t.v10M15==='DOWN'],
+  ['SELL 85–89 + body >70% + M15 searah',t=>t.side==='SELL'&&t.v10Score>=85&&t.v10Score<90&&t.v10BodyRatio>0.70&&t.v10M15==='DOWN'],
+  ['BUY 80+ + M15 searah',t=>t.side==='BUY'&&t.v10Score>=80&&t.v10M15==='UP'],
+  ['BUY body ≤35%',t=>t.side==='BUY'&&t.v10BodyRatio<=0.35],
+  ['BUY M15 searah + body ≤35%',t=>t.side==='BUY'&&t.v10M15==='UP'&&t.v10BodyRatio<=0.35]
+ ];
+ const fmt=x=>`${x.n}x · WR ${x.winRate.toFixed(1)}% · PF ${Number.isFinite(x.pf)?x.pf.toFixed(2):'∞'} · net ${(x.net>0?'+':'')+x.net.toFixed(2)}R · DD ${x.maxDD.toFixed(2)}R · TP ${x.tp} · SL ${x.sl} · TIME ${x.time}`;
+ const rows=defs.map(([name,fn])=>{const all=trades.filter(fn),crossBoundary=all.filter(t=>t.signalEpoch<splitEpoch&&(!t.exitEpoch||t.exitEpoch>=splitEpoch)).length,train=all.filter(t=>t.signalEpoch<splitEpoch&&t.exitEpoch<splitEpoch),test=all.filter(t=>t.signalEpoch>=splitEpoch);return {name,train,test,crossBoundary,trainStats:summarizeTrades(train),testStats:summarizeTrades(test)};});
+ const eligible=rows.filter(x=>x.trainStats.n>=15&&x.trainStats.net>0&&x.trainStats.pf>=1.05).sort((a,b)=>b.trainStats.pf-a.trainStats.pf||b.trainStats.net-a.trainStats.net);
+ const selected=eligible[0]||null;
+ const lines=[`BATAS WAKTU: ${new Date(splitEpoch*1000).toLocaleString('id-ID')}`,`PERIODE DATA: ${new Date(periodStart*1000).toLocaleString('id-ID')} sampai ${new Date(periodEnd*1000).toLocaleString('id-ID')}`,'PEMBAGIAN: 60% waktu awal = SELEKSI · 40% waktu akhir = UJI OUT-OF-SAMPLE','', 'HASIL PER KANDIDAT (TRAIN → TEST):'];
+ rows.forEach(x=>{lines.push(`${x.name}\n  SELEKSI: ${fmt(x.trainStats)}\n  UJI BARU: ${fmt(x.testStats)}\n  Dikeluarkan karena transaksi melewati batas waktu: ${x.crossBoundary}`);});
+ lines.push('',selected?`KANDIDAT TERATAS BERDASARKAN DATA SELEKSI SAJA: ${selected.name}. Hasil uji baru kandidat ini: ${fmt(selected.testStats)}.`:'BELUM ADA KANDIDAT LAYAK DIPILIH: tidak ada yang memenuhi minimal 15 transaksi, net positif, dan PF ≥1,05 pada data seleksi.');
+ lines.push('','ATURAN BACA: kandidat baru layak dipertimbangkan jika hasil periode UJI BARU juga positif, PF >1, sampelnya memadai (idealnya ≥30), dan drawdown masih masuk akal. Jika sampel test kecil atau hasilnya negatif, jangan aktifkan. Pemilihan kandidat tidak menggunakan hasil test.');
+ lines.push('CATATAN PENTING: transaksi seleksi yang masih terbuka melewati batas 60/40 dikeluarkan agar hasil seleksi tidak memakai candle dari periode uji. Ini validasi kronologis pada subset sinyal V10 yang tidak saling tumpang tindih. Ini bukan simulasi strategi filter yang membuka sinyal pengganti saat sinyal V10 lain dibuang. Biaya transaksi, spread, slippage, dan perbedaan harga MT5 belum dihitung.');
+ $('v14Lab').textContent=lines.join('\n');
+}
+async function runBacktest(){
+ const symbol=$('symbol').value;if(!symbol){$('btStatus').textContent='Pilih instrumen terlebih dahulu.';return;}
+ $('runBacktest').disabled=true;$('btBadge').textContent='SEDANG BERJALAN';$('btBadge').className='pill yellow';$('btStatus').textContent='Mengambil data historis lebih panjang...';$('btDetail').textContent='Membandingkan aturan lama, v9 ketat, dan v10 seimbang dengan asumsi transaksi yang sama.';
+ try{
+  const [raw1,raw5,raw15]=await Promise.all([getCandles(symbol,60,5000),getCandles(symbol,300,1200),getCandles(symbol,900,500)]);
+  const now=latestTickEpoch||Math.floor(Date.now()/1000);
+  const m1=raw1.filter(c=>c.epoch+60<=now),m5=raw5.filter(c=>c.epoch+300<=now),m15=raw15.filter(c=>c.epoch+900<=now);
+  if(m1.length<100||m5.length<35)throw Error(`Data historis belum cukup (M1 ${m1.length}, M5 ${m5.length}).`);
+  const selected=symbols.find(x=>x.code===symbol),identity=[symbol,selected&&selected.name].filter(Boolean).join(' '),isBtcM1=/BTC|BITCOIN/i.test(identity)&&$('tf').value==='60';
+  let baseTrades=[],v9Trades=[],v10Trades=[],baseSkip=-1,v9Skip=-1,v10Skip=-1,baseSignals=0,v9Signals=0,v10Signals=0;
+  const v11Defs=[{key:'Skor 80+ · M5 tidak datar',pass:t=>t.v10Score>=80&&t.v10M5!=='SIDEWAYS'},{key:'Skor 80+ · M5 searah',pass:t=>t.v10Score>=80&&((t.side==='BUY'&&t.v10M5==='UP')||(t.side==='SELL'&&t.v10M5==='DOWN'))},{key:'BUY 80+ · M5 searah',pass:t=>t.side==='BUY'&&t.v10Score>=80&&t.v10M5==='UP'},{key:'SELL 80+ · M5 searah',pass:t=>t.side==='SELL'&&t.v10Score>=80&&t.v10M5==='DOWN'}];
+  const v11Trades=v11Defs.map(()=>[]),v11Skips=v11Defs.map(()=>-1);
+  for(let i=40;i<m1.length-31;i++){
+   const sig=backtestSignalAt(m1,m5,m15,i,isBtcM1);if(!sig)continue;
+   if(sig.side&&i>baseSkip){baseSignals++;const result=simulateBacktestTrade(m1,i,{side:sig.side,atr:sig.atr},1,1.5,30);if(result){baseTrades.push({...result,side:sig.side,score:sig.score,entryEpoch:m1[i+1].epoch,signalEpoch:m1[i].epoch});baseSkip=result.exitIndex;}}
+   if(sig.v9&&i>v9Skip){v9Signals++;const result=simulateBacktestTrade(m1,i,{side:sig.v9,atr:sig.atr},1,1.5,30);if(result){v9Trades.push({...result,side:sig.v9,score:sig.score,entryEpoch:m1[i+1].epoch,signalEpoch:m1[i].epoch});v9Skip=result.exitIndex;}}
+   if(sig.v10){const meta={...(sig.v10Meta||{}),side:sig.v10,score:sig.v10Meta?.v10Score??sig.score,entryEpoch:m1[i+1].epoch,signalEpoch:m1[i].epoch};const probe={...meta};for(let q=0;q<v11Defs.length;q++){if(v11Defs[q].pass(probe)&&i>v11Skips[q]){const candidateResult=simulateBacktestTrade(m1,i,{side:sig.v10,atr:sig.atr},1,1.5,30);if(candidateResult){v11Trades[q].push({...candidateResult,...meta,holdBars:candidateResult.exitIndex-i});v11Skips[q]=candidateResult.exitIndex;}}}if(i>v10Skip){v10Signals++;const result=simulateBacktestTrade(m1,i,{side:sig.v10,atr:sig.atr},1,1.5,30);if(result){v10Trades.push({...result,...meta,holdBars:result.exitIndex-i,exitEpoch:m1[result.exitIndex].epoch});v10Skip=result.exitIndex;}}}
+  }
+  if(!baseTrades.length)throw Error('Aturan lama tidak menghasilkan transaksi pada data ini. Coba ulangi atau pilih instrumen lain.');
+  const base=summarizeTrades(baseTrades),v9=summarizeTrades(v9Trades),v10=summarizeTrades(v10Trades);renderDiagnostics(v10Trades);
+  const fmtCandidate=(name,x)=>`${name}: ${x.n} transaksi · WR ${x.winRate.toFixed(1)}% · PF ${Number.isFinite(x.pf)?x.pf.toFixed(2):'∞'} · net ${(x.net>0?'+':'')+x.net.toFixed(2)}R · DD ${x.maxDD.toFixed(2)}R · TP ${x.tp} · SL ${x.sl} · TIME ${x.time}`;
+  $('v11Lab').textContent=v11Defs.map((d,q)=>fmtCandidate(d.key,summarizeTrades(v11Trades[q]))).concat(['Catatan: V11 belum mengubah sinyal live. Bandingkan jumlah sampel, PF, hasil bersih, dan drawdown; PF tinggi dari sedikit transaksi belum cukup. Semua kandidat berasal dari subset sinyal V10 dan bukan bukti profit masa depan.']).join('\n');
+  const sell80=v10Trades.filter(t=>t.side==='SELL'&&t.v10Score>=80);
+  const v12Groups=[
+   ['Skor 80–84',t=>t.v10Score>=80&&t.v10Score<85],['Skor 85–89',t=>t.v10Score>=85&&t.v10Score<90],['Skor 90–94',t=>t.v10Score>=90&&t.v10Score<95],['Skor 95–100',t=>t.v10Score>=95],
+   ['M15 searah SELL',t=>t.v10M15==='DOWN'],['M15 datar',t=>t.v10M15==='SIDEWAYS'],['M15 berlawanan SELL',t=>t.v10M15==='UP'],['M15 belum cukup',t=>t.v10M15==='UNKNOWN'],
+   ['Body candle ≤35%',t=>t.v10BodyRatio<=0.35],['Body candle 35–70%',t=>t.v10BodyRatio>0.35&&t.v10BodyRatio<=0.70],['Body candle >70%',t=>t.v10BodyRatio>0.70]
+  ];
+  const groupLine=(label,items)=>{const x=summarizeTrades(items);return `${label}: ${x.n}x · WR ${x.winRate.toFixed(1)}% · PF ${Number.isFinite(x.pf)?x.pf.toFixed(2):'∞'} · net ${(x.net>0?'+':'')+x.net.toFixed(2)}R · DD ${x.maxDD.toFixed(2)}R · SL ${x.sl}`;};
+  $('v12Lab').textContent=[`DASAR SELL 80+: ${sell80.length} transaksi`,...v12Groups.map(([label,fn])=>groupLine(label,sell80.filter(fn))), 'Catatan: kelompok-kelompok ini saling tumpang tindih pada dimensi berbeda; jangan menjumlahkannya. M15 memakai candle yang sudah tertutup pada waktu sinyal. Body ratio hanya ukuran bentuk candle, bukan bukti entry terlambat.'].join('\n');
+  // V13: candidate combinations are diagnostic subsets of already simulated, non-overlapping V10 trades.
+  const sell8589=v10Trades.filter(t=>t.side==='SELL'&&t.v10Score>=85&&t.v10Score<90);
+  const v13Defs=[
+   ['SELL 85–89 (dasar)',t=>true],
+   ['SELL 85–89 + body >70%',t=>t.v10BodyRatio>0.70],
+   ['SELL 85–89 + M15 searah',t=>t.v10M15==='DOWN'],
+   ['SELL 85–89 + body >70% + M15 searah',t=>t.v10BodyRatio>0.70&&t.v10M15==='DOWN']
+  ];
+  $('v13Lab').textContent=[`KANDIDAT SELL 85–89: ${sell8589.length} transaksi dasar`,...v13Defs.map(([label,fn])=>groupLine(label,sell8589.filter(fn))),
+   `DIAGNOSIS BUY: ${v10Trades.filter(t=>t.side==='BUY').length} transaksi`,
+   ...[
+    ['BUY skor 62–69',t=>t.v10Score>=62&&t.v10Score<70],['BUY skor 70–79',t=>t.v10Score>=70&&t.v10Score<80],['BUY skor 80+',t=>t.v10Score>=80],
+    ['BUY M5 searah',t=>t.v10M5==='UP'],['BUY M5 datar',t=>t.v10M5==='SIDEWAYS'],['BUY M5 berlawanan',t=>t.v10M5==='DOWN'],
+    ['BUY M15 searah',t=>t.v10M15==='UP'],['BUY M15 datar',t=>t.v10M15==='SIDEWAYS'],['BUY M15 berlawanan',t=>t.v10M15==='DOWN'],
+    ['BUY body ≤35%',t=>t.v10BodyRatio<=0.35],['BUY body 35–70%',t=>t.v10BodyRatio>0.35&&t.v10BodyRatio<=0.70],['BUY body >70%',t=>t.v10BodyRatio>0.70]
+   ].map(([label,fn])=>groupLine(label,v10Trades.filter(t=>t.side==='BUY'&&fn(t)))),
+   'Catatan: kandidat V13 adalah subset dari transaksi V10 yang sudah disimulasikan, sehingga hasilnya bisa dibandingkan pada periode dan asumsi yang sama. Kelompok diagnosis BUY saling tumpang tindih; jangan dijumlahkan. Sampel kecil belum membuktikan keunggulan dan belum boleh diaktifkan untuk sinyal live.'
+  ].join('\n');
+  const splitIndex=Math.max(1,Math.min(m1.length-1,Math.floor(m1.length*0.60)));const splitEpoch=m1[splitIndex].epoch;renderV14Validation(v10Trades,splitEpoch,m1[0].epoch,m1[m1.length-1].epoch);
+  $('btTrades').textContent=String(v10.n);$('btWinRate').textContent=v10.n?v10.winRate.toFixed(1)+'%':'—';$('btPF').textContent=v10.n?(Number.isFinite(v10.pf)?v10.pf.toFixed(2):'∞'):'—';
+  $('btWins').textContent=String(v10.tp);$('btLosses').textContent=String(v10.sl);$('btNetR').textContent=v10.n?(v10.net>0?'+':'')+v10.net.toFixed(2)+' R':'—';
+  $('btBadge').textContent=v10.n?'PERBANDINGAN 3 STRATEGI':'V10: NIHIL';$('btBadge').className='pill '+(v10.n&&v10.net>0?'green':'yellow');
+  $('btStatus').textContent=`${symbol}: ${m1.length} M1, ${m5.length} M5, ${m15.length} M15 candle tertutup. Aturan lama ${base.n} transaksi; v9 ketat ${v9.n}; v10 seimbang ${v10.n}. Periode ${new Date(m1[0].epoch*1000).toLocaleString('id-ID')} sampai ${new Date(m1[m1.length-1].epoch*1000).toLocaleString('id-ID')}.`;
+  const line=(name,x)=>`${name}: ${x.n} transaksi, win rate ${x.winRate.toFixed(1)}%, PF ${Number.isFinite(x.pf)?x.pf.toFixed(2):'∞'}, bersih ${(x.net>0?'+':'')+x.net.toFixed(2)} R, DD ${x.maxDD.toFixed(2)} R, TP ${x.tp}, SL ${x.sl}, TIME ${x.time}.`;
+  $('btDetail').textContent=`${line('ATURAN LAMA',base)} ${line('V9 KETAT',v9)} ${line('V10 SEIMBANG',v10)} Semua memakai SL 1 ATR, TP 1,5 ATR, entry open candle berikutnya, maksimal 30 candle. Spread, komisi, slippage, dan selisih harga MT5 belum dihitung. Angka ini simulasi historis, bukan jaminan hasil live.`;
+  log(`BACKTEST ${symbol}: lama ${base.n} trade; v9 ${v9.n}; v10 ${v10.n}; V11 candidates ${v11Trades.map(x=>x.length).join('/') }; V13 SELL 85–89 ${sell8589.length}. V14 chronological 60/40 ready. V10 PF ${Number.isFinite(v10.pf)?v10.pf.toFixed(2):'∞'}, net ${v10.net.toFixed(2)}R.`);
+ }catch(e){$('btBadge').textContent='GAGAL';$('btBadge').className='pill red';$('btStatus').textContent=e.message;log('BACKTEST ERROR: '+e.message);}
+ finally{$('runBacktest').disabled=!(ws&&ws.readyState===WebSocket.OPEN&&$('symbol').value);}
+}
+function fmt(v){return v===null||!Number.isFinite(v)?'—':v.toLocaleString('en-US',{maximumFractionDigits:8});}
+function drawChart(){const c=$('chart'),ctx=c.getContext('2d'),w=c.width,h=c.height;ctx.clearRect(0,0,w,h);ctx.fillStyle='#0b1727';ctx.fillRect(0,0,w,h);const a=candles.map(x=>({o:Number(x.open),hi:Number(x.high),lo:Number(x.low),cl:Number(x.close)})).filter(x=>[x.o,x.hi,x.lo,x.cl].every(Number.isFinite));if(!a.length){ctx.fillStyle='#9aadc5';ctx.fillText('Belum ada data candle',18,28);return;}const view=a.slice(-100),min=Math.min(...view.map(x=>x.lo)),max=Math.max(...view.map(x=>x.hi)),range=max-min||1,pad=20,usable=h-pad*2,step=(w-pad*2)/view.length,body=Math.max(2,step*.58),y=v=>pad+(max-v)/range*usable;ctx.strokeStyle='#263951';for(let i=0;i<5;i++){const yy=pad+i*usable/4;ctx.beginPath();ctx.moveTo(pad,yy);ctx.lineTo(w-pad,yy);ctx.stroke();}view.forEach((x,i)=>{const xx=pad+i*step+step/2,col=x.cl>=x.o?'#20c997':'#ff647c';ctx.strokeStyle=col;ctx.fillStyle=col;ctx.beginPath();ctx.moveTo(xx,y(x.hi));ctx.lineTo(xx,y(x.lo));ctx.stroke();ctx.fillRect(xx-body/2,Math.min(y(x.o),y(x.cl)),body,Math.max(2,Math.abs(y(x.o)-y(x.cl))));});}
+$('runBacktest').onclick=runBacktest;$('connect').onclick=connect;$('disconnect').onclick=()=>{stopScanner();disconnect();};$('scanToggle').onclick=()=>scannerTimer?stopScanner():startScanner();$('load').onclick=loadAnalysis;$('live').onclick=startLive;$('checkContracts').onclick=checkContracts;$('market').onchange=renderSymbols;$('symbol').onchange=()=>{stopScanner();scanBusy=false;lastEvaluatedM1Epoch=0;lastJournalEpoch=0;lastAnalysis=null;latestTickPrice=null;latestTickEpoch=0;tickSamples=[];updateTickMomentum();$('entryPrice').textContent='—';$('entryTime').textContent='—';clearTradePlan('MENUNGGU SINYAL');loadToken++;updateSelected();candles=[];drawChart();$('price').textContent='—';$('tickTime').textContent='Menunggu tick...';$('contractInfo').textContent='Belum diperiksa.';$('signal').textContent='MENUNGGU DATA';$('signal').className='signal yellow';$('analysisBadge').textContent='BELUM DIANALISIS';$('analysisBadge').className='pill yellow';$('reason').textContent='Tekan MUAT GRAFIK + ANALISIS untuk mengambil M1 dan M5.';$('m5Direction').textContent='—';$('m1Direction').textContent='—';};$('tf').onchange=()=>{if($('symbol').value&&ws&&ws.readyState===WebSocket.OPEN)loadAnalysis();};$('clearLog').onclick=()=>$('log').textContent='Log dibersihkan.';drawChart();
+</script></body></html>
