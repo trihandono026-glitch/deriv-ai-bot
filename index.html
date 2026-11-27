@@ -825,7 +825,6 @@ async function placeTrade(r){
   busy=false;
  }
 }
- cat >> index.html <<'EOF'
 async function resubscribeActiveContract(){
  if(!activeContract||!tradeWS||tradeWS.readyState!==WebSocket.OPEN)return;
  try{
