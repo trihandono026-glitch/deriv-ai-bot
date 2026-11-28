@@ -5,10 +5,9 @@ FILE="index.html"
 
 if [ -f "$FILE" ]; then
   cp "$FILE" "index_backup_$(date +%Y%m%d_%H%M%S).html"
-  echo "Backup index lama berhasil dibuat."
 fi
 
-cat > index.html <<'HTML'
+cat > "$FILE" <<'HTML'
 <!DOCTYPE html>
 <html lang="id">
 <head>
@@ -18,10 +17,9 @@ cat > index.html <<'HTML'
 <title>DERIV AI BOT V21</title>
 <style>
 *{box-sizing:border-box}
-body{margin:0;background:#0b1220;color:#e7edf8;font:14px Arial,sans-serif;padding:12px}
+body{margin:0;background:#0b1220;color:#e7edf8;font:14px Arial;padding:12px}
 main{max-width:1050px;margin:auto}
-h2{color:#58ddb0;margin-bottom:4px}
-h3{margin:0 0 12px}
+h2{color:#58ddb0}
 small,.muted{color:#91a2bb}
 .card{background:#151f30;border:1px solid #293951;border-radius:12px;padding:14px;margin:12px 0}
 .grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
@@ -29,14 +27,13 @@ small,.muted{color:#91a2bb}
 label{display:block;margin:9px 0 4px;color:#b8c6da}
 input,select,button{width:100%;padding:12px;border-radius:8px;border:1px solid #354762;background:#0b1423;color:white;margin:4px 0}
 button{background:#087c59;border:0;font-weight:bold;cursor:pointer}
-button:disabled{opacity:.45}
 button.stop{background:#a83b45}
 button.secondary{background:#34445e}
 .value{font-size:19px;font-weight:bold;color:#64ddb0;overflow-wrap:anywhere}
 .row{display:flex;gap:8px}
 .row>*{flex:1;min-width:0}
-#symbols{display:grid;grid-template-columns:1fr 1fr;gap:6px;max-height:280px;overflow:auto}
-.sym{display:flex;align-items:center;gap:7px;background:#0d1728;padding:8px;border-radius:7px;overflow-wrap:anywhere}
+#symbols{display:grid;grid-template-columns:1fr 1fr;gap:6px;max-height:300px;overflow:auto}
+.sym{display:flex;align-items:center;gap:7px;background:#0d1728;padding:8px;border-radius:7px}
 .sym input{width:auto;margin:0}
 #logs{height:260px;overflow:auto;background:#070d17;padding:10px;border-radius:8px;font:12px monospace;white-space:pre-wrap;overflow-wrap:anywhere}
 .pill{display:inline-block;background:#263851;border-radius:7px;padding:6px;margin:3px;font-size:12px}
@@ -45,12 +42,15 @@ button.secondary{background:#34445e}
 table{width:100%;border-collapse:collapse;font-size:12px}
 td,th{padding:8px;border-bottom:1px solid #2c3b52;text-align:left;white-space:nowrap}
 .statusline{display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap}
-@media(min-width:700px){.grid{grid-template-columns:repeat(4,minmax(0,1fr))}.grid4{grid-template-columns:repeat(4,minmax(0,1fr))}}
+@media(min-width:700px){
+ .grid{grid-template-columns:repeat(4,minmax(0,1fr))}
+ .grid4{grid-template-columns:repeat(4,minmax(0,1fr))}
+}
 </style>
 </head>
-
 <body>
 <main>
+
 <h2>DERIV AI BOT V21</h2>
 <small>DEMO ONLY · MULTI-INSTRUMENT · AUTO ENTRY · RISK CONTROL · PERSISTENT JOURNAL</small>
 
@@ -70,12 +70,12 @@ td,th{padding:8px;border-bottom:1px solid #2c3b52;text-align:left;white-space:no
 <div>SALDO<div id="balance" class="value">--</div></div>
 <div>JAM WIB<div id="clock" class="value">--</div></div>
 </div>
-<p class="muted" id="connectionInfo">Belum terhubung.</p>
+<p id="connectionInfo" class="muted">Belum terhubung.</p>
 </div>
 
 <div class="card">
 <h3>Scanner Instrumen</h3>
-<p class="muted">Instrumen dimuat dari daftar yang diberikan API. Pilih instrumen yang ingin dipantau.</p>
+<p class="muted">Daftar instrumen dimuat langsung dari API Deriv. Pilih instrumen yang ingin dipantau.</p>
 <div class="row">
 <button id="selectAll">PILIH SEMUA</button>
 <button id="selectNone" class="secondary">KOSONGKAN</button>
@@ -85,6 +85,7 @@ td,th{padding:8px;border-bottom:1px solid #2c3b52;text-align:left;white-space:no
 <span>Instrumen tersedia: <b id="symbolCount">0</b></span>
 <span>Dipilih: <b id="selectedCount">0</b></span>
 </div>
+<p id="scannerStatus" class="muted">Scanner belum aktif.</p>
 </div>
 
 <div class="card">
@@ -133,7 +134,7 @@ td,th{padding:8px;border-bottom:1px solid #2c3b52;text-align:left;white-space:no
 </select>
 </div>
 </div>
-<p class="warn">Entry hanya dilakukan jika sinyal lolos validasi, koneksi siap, kontrak tersedia, dan batas risiko belum tercapai. Tidak ada jaminan profit.</p>
+<p class="warn">Bot hanya entry jika sinyal lolos validasi dan batas risiko mengizinkan. Tidak ada jaminan profit.</p>
 <div class="row">
 <button id="start">MULAI AUTO ENTRY DEMO</button>
 <button id="stop" class="stop">STOP ENTRY BARU</button>
@@ -171,7 +172,7 @@ td,th{padding:8px;border-bottom:1px solid #2c3b52;text-align:left;white-space:no
 
 <div class="card">
 <h3>Jurnal Permanen</h3>
-<p class="muted">Log dan transaksi disimpan di IndexedDB browser ini, termasuk setelah reload. Ekspor cadangan secara berkala.</p>
+<p class="muted">Log dan transaksi disimpan di IndexedDB browser ini. Ekspor cadangan secara berkala.</p>
 <div class="row">
 <button id="exportJson">EXPORT JSON</button>
 <button id="exportCsv" class="secondary">EXPORT CSV</button>
@@ -183,20 +184,18 @@ td,th{padding:8px;border-bottom:1px solid #2c3b52;text-align:left;white-space:no
 <h3>Log Aktivitas</h3>
 <div id="logs"></div>
 </div>
+
 </main>
 
 <script>
 "use strict";
 
-/* =========================================================
-   KONFIGURASI DAN STATE
-========================================================= */
+/* ===================== KONFIGURASI ===================== */
 
 const $=id=>document.getElementById(id);
 const REST="https://api.derivws.com/trading/v1/options";
 const PUBLIC_WS="wss://api.derivws.com/trading/v1/options/ws/public";
 const DB_NAME="DERIV_V21_PERMANENT_JOURNAL";
-const DB_VERSION=1;
 
 let db=null;
 let account=null;
@@ -216,38 +215,27 @@ let selected=new Set();
 let active=new Map();
 let pending=new Map();
 
-let wins=0;
-let losses=0;
-let trades=0;
-let sessionProfit=0;
-
+let wins=0,losses=0,trades=0,sessionProfit=0;
 let lastBucket=0;
+
 let reconnectTimers={account:null,market:null};
 let reconnectAttempts={account:0,market:0};
-let scannerTimer=null;
 let pingTimer=null;
+let scannerTimer=null;
 let reconcileTimer=null;
+let scanQueue=Promise.resolve();
 
-const MAX_LOG_DISPLAY=500;
-
-/* =========================================================
-   DATABASE INDEXEDDB
-========================================================= */
+/* ===================== DATABASE ===================== */
 
 function openDB(){
  return new Promise((resolve,reject)=>{
   if(db){resolve(db);return;}
-  if(!("indexedDB" in window)){
-   reject(Error("Browser tidak mendukung IndexedDB"));
-   return;
-  }
-  const req=indexedDB.open(DB_NAME,DB_VERSION);
+  const req=indexedDB.open(DB_NAME,1);
   req.onupgradeneeded=()=>{
    const d=req.result;
    if(!d.objectStoreNames.contains("events")){
     const st=d.createObjectStore("events",{keyPath:"id",autoIncrement:true});
     st.createIndex("time","time");
-    st.createIndex("type","type");
    }
    if(!d.objectStoreNames.contains("contracts")){
     d.createObjectStore("contracts",{keyPath:"contract_id"});
@@ -258,7 +246,6 @@ function openDB(){
   };
   req.onsuccess=()=>{db=req.result;resolve(db);};
   req.onerror=()=>reject(req.error||Error("Database gagal dibuka"));
-  req.onblocked=()=>reject(Error("Database sedang digunakan tab lain"));
  });
 }
 
@@ -278,25 +265,21 @@ function dbAddEvent(type,data={}){
  return dbAction("events","readwrite",st=>st.add({
   time:new Date().toISOString(),
   wib:new Date().toLocaleString("id-ID",{timeZone:"Asia/Jakarta"}),
-  type,
-  data
+  type,data
  }));
 }
 
 function dbSaveContract(data){
- if(!data||!data.contract_id)return Promise.resolve();
- const row={
+ if(!data?.contract_id)return Promise.resolve();
+ return dbAction("contracts","readwrite",st=>st.put({
   contract_id:String(data.contract_id),
   updated_at:new Date().toISOString(),
   data
- };
- return dbAction("contracts","readwrite",st=>st.put(row));
+ }));
 }
 
 function dbSaveMeta(key,value){
- return dbAction("meta","readwrite",st=>st.put({
-  key,value,updated_at:new Date().toISOString()
- }));
+ return dbAction("meta","readwrite",st=>st.put({key,value}));
 }
 
 function dbGetAll(store){
@@ -313,61 +296,45 @@ async function restoreJournal(){
   await openDB();
   const meta=await dbGetAll("meta");
   const saved=Object.fromEntries(meta.map(x=>[x.key,x.value]));
-
   if(saved.stats){
    wins=Number(saved.stats.wins)||0;
    losses=Number(saved.stats.losses)||0;
    trades=Number(saved.stats.trades)||0;
    sessionProfit=Number(saved.stats.sessionProfit)||0;
   }
-
   const rows=await dbGetAll("contracts");
   for(const row of rows){
    const c=row.data||{};
    const id=String(row.contract_id);
-   if(c.is_sold||c.status==="sold"||c.settled===true)continue;
-   if(!active.has(id)){
-    active.set(id,{
-     id,
-     symbol:c.underlying||c.symbol||"?",
-     stake:Number(c.buy_price)||0,
-     status:"MENUNGGU PEMULIHAN",
-     seen:false,
-     data:c
-    });
-   }
+   if(c.settled||c.is_sold||c.status==="sold")continue;
+   active.set(id,{
+    id,symbol:c.underlying_symbol||c.underlying||c.symbol||"?",
+    side:c.contract_type||"?",
+    stake:Number(c.buy_price)||0,
+    status:"MENUNGGU PEMULIHAN",
+    seen:false
+   });
   }
-
   updateStats();
-  renderContracts();
-  $("storageStatus").textContent=
-   "IndexedDB aktif · "+rows.length+" kontrak tersimpan";
-  log("Jurnal lama dipulihkan. Kontrak yang belum selesai: "+active.size);
-  dbAddEvent("JOURNAL_RESTORED",{
-   contracts:rows.length,
-   active:active.size
-  });
+  $("storageStatus").textContent="IndexedDB aktif · "+rows.length+" kontrak tersimpan";
+  log("Jurnal lama dipulihkan. Kontrak belum selesai: "+active.size);
+  await dbAddEvent("JOURNAL_RESTORED",{contracts:rows.length,active:active.size});
  }catch(e){
   $("storageStatus").textContent="PENYIMPANAN GAGAL: "+e.message;
-  log("GAGAL MEMULIHKAN JURNAL: "+e.message);
+  log("Gagal memulihkan jurnal: "+e.message);
  }
 }
 
-/* =========================================================
-   LOG DAN UI
-========================================================= */
+/* ===================== LOG DAN TAMPILAN ===================== */
 
 function log(message,type="INFO"){
- const now=new Date();
- const time=now.toLocaleTimeString("id-ID",{timeZone:"Asia/Jakarta"});
+ const time=new Date().toLocaleTimeString("id-ID",{timeZone:"Asia/Jakarta"});
  const line=time+" WIB | "+message;
  const el=$("logs");
  el.textContent=line+"\n"+el.textContent;
- const lines=el.textContent.split("\n");
- if(lines.length>MAX_LOG_DISPLAY)el.textContent=lines.slice(0,MAX_LOG_DISPLAY).join("\n");
+ el.textContent=el.textContent.split("\n").slice(0,500).join("\n");
  dbAddEvent(type,{message:String(message)}).catch(e=>{
-  console.error("Gagal menyimpan log:",e);
-  $("storageStatus").textContent="GAGAL MENYIMPAN JURNAL";
+  $("storageStatus").textContent="GAGAL MENYIMPAN JURNAL: "+e.message;
  });
 }
 
@@ -377,16 +344,24 @@ function updateStats(){
  $("losses").textContent=losses;
  $("openCount").textContent=active.size;
  $("profit").textContent=sessionProfit.toFixed(2);
- $("winRate").textContent=trades?
-  (wins/trades*100).toFixed(1)+"%":"0%";
-
+ $("winRate").textContent=trades?(wins/trades*100).toFixed(1)+"%":"0%";
  dbSaveMeta("stats",{wins,losses,trades,sessionProfit}).catch(console.error);
  renderContracts();
 }
 
-function setConnection(type,status){
- if(type==="account")$("accountStatus").textContent=status;
- if(type==="market")$("marketStatus").textContent=status;
+function renderContracts(){
+ const host=$("contractRows");
+ host.innerHTML="";
+ for(const c of [...active.values()].reverse()){
+  const tr=document.createElement("tr");
+  for(const v of [c.time||"--",c.id,c.symbol||"?",c.status||"OPEN",
+   c.profit===undefined?"--":Number(c.profit).toFixed(2)]){
+   const td=document.createElement("td");
+   td.textContent=v;
+   tr.append(td);
+  }
+  host.append(tr);
+ }
 }
 
 function renderSymbols(){
@@ -398,56 +373,30 @@ function renderSymbols(){
   const cb=document.createElement("input");
   cb.type="checkbox";
   cb.checked=selected.has(item.symbol);
-  cb.addEventListener("change",()=>{
+  cb.onchange=()=>{
    if(cb.checked)selected.add(item.symbol);
    else selected.delete(item.symbol);
    updateSelectedCount();
-  });
+  };
   const span=document.createElement("span");
   span.textContent=item.name+" ("+item.symbol+")";
   label.append(cb,span);
   host.append(label);
  }
- updateSelectedCount();
  $("symbolCount").textContent=symbols.length;
+ updateSelectedCount();
 }
 
 function updateSelectedCount(){
  $("selectedCount").textContent=selected.size;
 }
 
-function renderContracts(){
- const host=$("contractRows");
- if(!host)return;
- host.innerHTML="";
- const rows=[...active.values()].sort((a,b)=>String(b.id).localeCompare(String(a.id)));
- for(const c of rows){
-  const tr=document.createElement("tr");
-  const values=[
-   c.time||"--",
-   c.id,
-   c.symbol||"?",
-   c.status||"OPEN",
-   c.profit===undefined?"--":Number(c.profit).toFixed(2)
-  ];
-  for(const value of values){
-   const td=document.createElement("td");
-   td.textContent=value;
-   tr.append(td);
-  }
-  host.append(tr);
- }
-}
-
-/* =========================================================
-   WEBSOCKET RPC
-========================================================= */
+/* ===================== WEBSOCKET ===================== */
 
 function rpc(ws,data,timeout=15000){
  return new Promise((resolve,reject)=>{
   if(!ws||ws.readyState!==WebSocket.OPEN){
-   reject(Error("WebSocket belum siap"));
-   return;
+   reject(Error("WebSocket belum siap"));return;
   }
   const id=++reqId;
   data.req_id=id;
@@ -456,12 +405,9 @@ function rpc(ws,data,timeout=15000){
    reject(Error("Request timeout"));
   },timeout);
   pending.set(id,{resolve,reject,timer,ws});
-  try{
-   ws.send(JSON.stringify(data));
-  }catch(e){
-   clearTimeout(timer);
-   pending.delete(id);
-   reject(e);
+  try{ws.send(JSON.stringify(data));}
+  catch(e){
+   clearTimeout(timer);pending.delete(id);reject(e);
   }
  });
 }
@@ -479,7 +425,10 @@ function rejectPending(ws){
 function attachSocket(ws,type){
  ws.onmessage=event=>{
   let data;
-  try{data=JSON.parse(event.data);}catch(e){return;}
+  try{data=JSON.parse(event.data);}catch(e){
+   log("Respons "+type+" bukan JSON valid.");
+   return;
+  }
 
   if(data.req_id&&pending.has(data.req_id)){
    const p=pending.get(data.req_id);
@@ -490,29 +439,21 @@ function attachSocket(ws,type){
   }
 
   if(data.error){
-   log(type+" API: "+data.error.message,"API_ERROR");
+   log(type+" API ERROR: "+data.error.message,"API_ERROR");
   }
 
   if(type==="account"){
    if(data.balance){
-    const b=data.balance;
     $("balance").textContent=
-     Number(b.balance).toFixed(2)+" "+(b.currency||"");
+     Number(data.balance.balance).toFixed(2)+" "+(data.balance.currency||"");
    }
-
-   if(data.proposal_open_contract){
-    onContract(data.proposal_open_contract);
-   }
-
-   if(data.buy&&data.buy.contract_id){
+   if(data.proposal_open_contract)onContract(data.proposal_open_contract);
+   if(data.buy?.contract_id){
     const id=String(data.buy.contract_id);
     if(!active.has(id)){
      active.set(id,{
-      id,
-      symbol:"?",
-      stake:Number(data.buy.buy_price)||0,
-      status:"OPEN",
-      seen:false
+      id,symbol:"?",stake:Number(data.buy.buy_price)||0,
+      status:"OPEN",seen:false
      });
     }
     dbAddEvent("BUY_RESPONSE",{contract_id:id,buy:data.buy});
@@ -533,15 +474,11 @@ function attachSocket(ws,type){
    type,code:ws.code,reason:ws.reason,intentional:intentionalClose
   });
   if(intentionalClose)return;
-
   if(type==="account"){
-   account=null;
-   setConnection("account","TERPUTUS");
+   account=null;$("accountStatus").textContent="TERPUTUS";
   }else{
-   market=null;
-   setConnection("market","TERPUTUS");
+   market=null;$("marketStatus").textContent="TERPUTUS";
   }
-
   log("Koneksi "+type+" terputus.","CONNECTION_LOST");
   if(running)scheduleReconnect(type);
  };
@@ -566,80 +503,116 @@ function openSocket(url,type){
   },15000);
   ws.addEventListener("open",()=>{
    if(finished)return;
-   finished=true;
-   clearTimeout(timer);
-   resolve(ws);
+   finished=true;clearTimeout(timer);resolve(ws);
   },{once:true});
   ws.addEventListener("error",()=>{
    if(finished)return;
-   finished=true;
-   clearTimeout(timer);
-   reject(Error(type+" gagal dibuka"));
+   finished=true;clearTimeout(timer);reject(Error(type+" gagal dibuka"));
   },{once:true});
  });
 }
 
-/* =========================================================
-   KONEKSI PASAR
-========================================================= */
+/* ===================== SCANNER INSTRUMEN ===================== */
+
+/*
+  API BARU:
+  underlying_symbol
+  underlying_symbol_name
+
+  API LAMA:
+  symbol
+  display_name
+
+  Fungsi ini menerima kedua format tersebut.
+  Permintaan active_symbols tidak memakai filter contract_type
+  agar daftar instrumen tidak terpangkas oleh filter kontrak.
+*/
+
+function normalizeSymbols(response){
+ const list=
+  response?.active_symbols||
+  response?.data?.active_symbols||
+  response?.data?.data?.active_symbols||
+  [];
+
+ if(!Array.isArray(list))return [];
+
+ return list.map(x=>{
+  const code=x.underlying_symbol||x.symbol;
+  const name=x.underlying_symbol_name||x.display_name||
+   x.name||code;
+  return {
+   symbol:code,
+   name:name,
+   market:x.market||"",
+   subgroup:x.subgroup||"",
+   suspended:Number(x.is_trading_suspended)===1
+  };
+ }).filter(x=>x.symbol&&!x.suspended);
+}
 
 async function connectMarket(){
- if(market&&market.readyState===WebSocket.OPEN)return;
+ if(market&&market.readyState===WebSocket.OPEN&&symbols.length)return;
 
- setConnection("market","MENGHUBUNGKAN");
+ $("marketStatus").textContent="MENGHUBUNGKAN";
+ $("scannerStatus").textContent="Meminta daftar instrumen dari API Deriv...";
+
  const ws=await openSocket(PUBLIC_WS,"market");
  market=ws;
 
- let response=await rpc(ws,{
-  active_symbols:"brief",
-  contract_type:["CALL","PUT"]
- },20000);
-
- let list=response.active_symbols||response.data?.active_symbols||[];
-
- if(!list.length){
+ let response;
+ try{
+  response=await rpc(ws,{active_symbols:"brief"},20000);
+ }catch(firstError){
+  log("Permintaan daftar brief gagal: "+firstError.message);
   response=await rpc(ws,{active_symbols:"full"},20000);
-  list=response.active_symbols||response.data?.active_symbols||[];
  }
 
- if(!list.length)throw Error("API tidak mengembalikan daftar instrumen.");
+ let found=normalizeSymbols(response);
 
- symbols=list
-  .filter(x=>x.symbol&&x.is_trading_suspended!==1)
-  .map(x=>({
-   symbol:x.symbol,
-   name:x.display_name||x.symbol,
-   market:x.market_display_name||x.market||""
-  }));
+ if(!found.length){
+  log("Daftar brief kosong. Mencoba permintaan full.");
+  response=await rpc(ws,{active_symbols:"full"},20000);
+  found=normalizeSymbols(response);
+ }
 
- symbols=[...new Map(symbols.map(x=>[x.symbol,x])).values()];
- symbols.sort((a,b)=>a.name.localeCompare(b.name));
+ if(!found.length){
+  const detail={
+   msg_type:response?.msg_type,
+   has_active_symbols:Array.isArray(response?.active_symbols),
+   response_keys:Object.keys(response||{})
+  };
+  await dbAddEvent("SCANNER_EMPTY_RESPONSE",detail);
+  throw Error("API merespons tetapi daftar instrumen kosong. Detail: "+
+   JSON.stringify(detail));
+ }
 
- if(!symbols.length)throw Error("Tidak ada instrumen yang dapat dipilih.");
-
+ symbols=found.sort((a,b)=>a.name.localeCompare(b.name));
  selected=new Set(symbols.map(x=>x.symbol));
+
  renderSymbols();
- setConnection("market","TERHUBUNG");
- $("connectionInfo").textContent="Data pasar terhubung.";
+
+ $("marketStatus").textContent="TERHUBUNG";
+ $("scannerStatus").textContent=
+  "Berhasil memuat "+symbols.length+" instrumen dari API Deriv.";
  reconnectAttempts.market=0;
 
- log("Data pasar aktif. Instrumen ditemukan: "+symbols.length);
- dbAddEvent("MARKET_CONNECTED",{count:symbols.length});
+ log("SCANNER BERHASIL: "+symbols.length+" instrumen ditemukan.");
+ await dbAddEvent("MARKET_CONNECTED",{
+  count:symbols.length,
+  sample:symbols.slice(0,10)
+ });
 }
 
-/* =========================================================
-   KONEKSI AKUN DEMO
-========================================================= */
+/* ===================== AKUN DEMO ===================== */
 
 async function connectAccount(){
  accountToken=$("token").value.trim();
  appId=$("appId").value.trim();
 
- if(!accountToken||!appId){
-  throw Error("App ID dan token DEMO wajib diisi.");
- }
+ if(!accountToken||!appId)throw Error("App ID dan token DEMO wajib diisi.");
 
- setConnection("account","MEMERIKSA AKUN");
+ $("accountStatus").textContent="MEMERIKSA AKUN";
 
  const response=await fetch(REST+"/accounts",{
   method:"GET",
@@ -649,9 +622,7 @@ async function connectAccount(){
   }
  });
 
- if(!response.ok){
-  throw Error("Pemeriksaan akun gagal. HTTP "+response.status);
- }
+ if(!response.ok)throw Error("Pemeriksaan akun gagal. HTTP "+response.status);
 
  const result=await response.json();
  const list=result.data||result.accounts||[];
@@ -660,7 +631,7 @@ async function connectAccount(){
   String(a.account_type||a.type||"").toLowerCase().includes("demo")
  );
 
- if(!demo)throw Error("Akun DEMO tidak ditemukan. Bot menolak akun REAL.");
+ if(!demo)throw Error("Akun DEMO tidak ditemukan. Akun REAL tidak diizinkan.");
 
  accountId=demo.account_id||demo.id;
  if(!accountId)throw Error("ID akun DEMO tidak ditemukan.");
@@ -676,9 +647,7 @@ async function connectAccount(){
   }
  );
 
- if(!otpResponse.ok){
-  throw Error("Gagal mendapatkan OTP WebSocket. HTTP "+otpResponse.status);
- }
+ if(!otpResponse.ok)throw Error("Gagal memperoleh OTP WebSocket. HTTP "+otpResponse.status);
 
  const otp=await otpResponse.json();
  const url=otp.data?.url;
@@ -693,37 +662,36 @@ async function connectAccount(){
  await rpc(ws,{balance:1,subscribe:1});
  await rpc(ws,{portfolio:1});
 
- setConnection("account","TERHUBUNG DEMO");
+ $("accountStatus").textContent="TERHUBUNG DEMO";
  $("connectionInfo").textContent="Akun DEMO aktif: "+accountId;
  reconnectAttempts.account=0;
 
  log("Akun DEMO berhasil terhubung.");
- dbAddEvent("ACCOUNT_CONNECTED",{accountId});
+ await dbAddEvent("ACCOUNT_CONNECTED",{accountId});
  await reconcileContracts();
 }
 
-/* =========================================================
-   RECONNECT DAN HEARTBEAT
-========================================================= */
+/* ===================== RECONNECT ===================== */
 
 function scheduleReconnect(type){
  if(!running||intentionalClose||reconnectTimers[type])return;
 
  reconnectAttempts[type]++;
- const delay=Math.min(30000,2000*Math.pow(2,Math.min(reconnectAttempts[type]-1,4)));
+ const delay=Math.min(30000,2000*Math.pow(2,
+  Math.min(reconnectAttempts[type]-1,4)));
 
- log("Reconnect "+type+" dijadwalkan "+(delay/1000)+" detik.");
- dbAddEvent("RECONNECT_SCHEDULED",{type,attempt:reconnectAttempts[type],delay});
+ log("Reconnect "+type+" dalam "+(delay/1000)+" detik.");
+ dbAddEvent("RECONNECT_SCHEDULED",{
+  type,attempt:reconnectAttempts[type],delay
+ });
 
  reconnectTimers[type]=setTimeout(async()=>{
   reconnectTimers[type]=null;
   if(!running)return;
-
   try{
    if(type==="market")await connectMarket();
    else{
     await connectAccount();
-    await reconcileContracts();
     await recoverSavedContracts();
    }
    log("Reconnect "+type+" berhasil.");
@@ -739,18 +707,10 @@ function startHeartbeat(){
  clearInterval(pingTimer);
  pingTimer=setInterval(()=>{
   if(!running)return;
-
-  if(account&&account.readyState===WebSocket.OPEN){
-   try{account.send(JSON.stringify({ping:1}));}
-   catch(e){
-    dbAddEvent("ACCOUNT_PING_FAILED",{message:e.message});
-   }
-  }
-
-  if(market&&market.readyState===WebSocket.OPEN){
-   try{market.send(JSON.stringify({ping:1}));}
-   catch(e){
-    dbAddEvent("MARKET_PING_FAILED",{message:e.message});
+  for(const ws of [account,market]){
+   if(ws?.readyState===WebSocket.OPEN){
+    try{ws.send(JSON.stringify({ping:1}));}
+    catch(e){dbAddEvent("PING_FAILED",{message:e.message});}
    }
   }
  },25000);
@@ -761,16 +721,16 @@ async function connectAll(){
  try{
   intentionalClose=false;
   running=true;
-  setConnection("account","MENGHUBUNGKAN");
-  setConnection("market","MENGHUBUNGKAN");
+  $("accountStatus").textContent="MENGHUBUNGKAN";
+  $("marketStatus").textContent="MENGHUBUNGKAN";
   await dbAddEvent("CONNECT_REQUEST",{});
   await connectMarket();
   await connectAccount();
   await recoverSavedContracts();
   startHeartbeat();
-  log("Semua koneksi siap.");
+  log("Koneksi akun dan pasar siap.");
  }catch(e){
-  log("Koneksi gagal: "+e.message,"CONNECT_ERROR");
+  log("KONEKSI GAGAL: "+e.message,"CONNECT_ERROR");
   if(!market)scheduleReconnect("market");
   if(!account)scheduleReconnect("account");
  }
@@ -782,41 +742,32 @@ function disconnectAll(){
  botOn=false;
  clearInterval(pingTimer);
  clearInterval(reconcileTimer);
- clearInterval(scannerTimer);
 
  Object.values(reconnectTimers).forEach(clearTimeout);
  reconnectTimers={account:null,market:null};
 
  dbAddEvent("MANUAL_DISCONNECT",{activeContracts:active.size});
-
  try{market?.close();}catch(e){}
  try{account?.close();}catch(e){}
+ market=null;account=null;
 
- market=null;
- account=null;
- setConnection("market","OFFLINE");
- setConnection("account","OFFLINE");
-
- log("Koneksi diputus manual. Riwayat tetap tersimpan.");
+ $("marketStatus").textContent="OFFLINE";
+ $("accountStatus").textContent="OFFLINE";
+ log("Koneksi diputus manual. Riwayat tersimpan.");
 }
 
-/* =========================================================
-   INDIKATOR DAN ANALISIS
-========================================================= */
+/* ===================== ANALISIS ===================== */
 
 function ema(values,period){
  if(values.length<period)return null;
  const k=2/(period+1);
- let value=values.slice(0,period).reduce((a,b)=>a+b,0)/period;
- for(let i=period;i<values.length;i++){
-  value=values[i]*k+value*(1-k);
- }
- return value;
+ let v=values.slice(0,period).reduce((a,b)=>a+b,0)/period;
+ for(let i=period;i<values.length;i++)v=values[i]*k+v*(1-k);
+ return v;
 }
 
 function average(values){
- if(!values.length)return 0;
- return values.reduce((a,b)=>a+b,0)/values.length;
+ return values.length?values.reduce((a,b)=>a+b,0)/values.length:0;
 }
 
 function analyzeCandles(candles){
@@ -828,9 +779,7 @@ function analyzeCandles(candles){
  const high=candles.map(x=>Number(x.high));
  const low=candles.map(x=>Number(x.low));
 
- if(close.some(x=>!Number.isFinite(x))||
-    high.some(x=>!Number.isFinite(x))||
-    low.some(x=>!Number.isFinite(x))){
+ if([...close,...high,...low].some(x=>!Number.isFinite(x))){
   return {side:"WAIT",score:0,reason:"Data harga tidak valid"};
  }
 
@@ -846,13 +795,12 @@ function analyzeCandles(candles){
  }
 
  const gains=changes.filter(x=>x>0).reduce((a,b)=>a+b,0);
- const lossesValue=-changes.filter(x=>x<0).reduce((a,b)=>a+b,0);
- const rsi=lossesValue===0?100:
-  100-100/(1+gains/Math.max(lossesValue,1e-10));
+ const down=-changes.filter(x=>x<0).reduce((a,b)=>a+b,0);
+ const rsi=down===0?100:100-100/(1+gains/Math.max(down,1e-10));
 
- const macdFast=ema(close.slice(-35),12);
- const macdSlow=ema(close.slice(-35),26);
- const macd=macdFast-macdSlow;
+ const fast=ema(close.slice(-35),12);
+ const slow=ema(close.slice(-35),26);
+ const macd=fast-slow;
 
  const tr=[];
  for(let i=1;i<candles.length;i++){
@@ -863,12 +811,10 @@ function analyzeCandles(candles){
   ));
  }
  const atr=average(tr.slice(-14));
-
  const rangeHigh=Math.max(...high.slice(-21,-1));
  const rangeLow=Math.min(...low.slice(-21,-1));
 
- let call=0;
- let put=0;
+ let call=0,put=0;
  const reasons=[];
 
  if(e9>e21){call++;reasons.push("arah harga naik");}
@@ -886,45 +832,30 @@ function analyzeCandles(candles){
  if(last>previous)call++;
  else if(last<previous)put++;
 
- if(last>rangeHigh){
-  call+=2;
-  reasons.push("menembus batas atas");
- }
- if(last<rangeLow){
-  put+=2;
-  reasons.push("menembus batas bawah");
- }
+ if(last>rangeHigh){call+=2;reasons.push("menembus batas atas");}
+ if(last<rangeLow){put+=2;reasons.push("menembus batas bawah");}
 
  if(!atr||!Number.isFinite(atr)){
   return {side:"WAIT",score:0,reason:"Volatilitas tidak valid"};
  }
 
  if(Math.abs(last-previous)>atr*2.8){
-  return {side:"WAIT",score:Math.max(call,put),reason:"Pergerakan terlalu ekstrem"};
+  return {side:"WAIT",score:Math.max(call,put),reason:"Pergerakan ekstrem"};
  }
 
  const threshold=Number($("minScore").value);
  let side="WAIT";
-
  if(call>=threshold&&call>put)side="CALL";
  if(put>=threshold&&put>call)side="PUT";
 
  return {
-  side,
-  score:Math.max(call,put),
-  callScore:call,
-  putScore:put,
+  side,score:Math.max(call,put),callScore:call,putScore:put,
   reason:reasons.join(", ")||"Konfirmasi belum cukup",
-  rsi,
-  atr,
-  price:last,
-  candleTime:candles.at(-1).epoch
+  rsi,atr,price:last,candleTime:candles.at(-1).epoch
  };
 }
 
-/* =========================================================
-   DATA CANDLE
-========================================================= */
+/* ===================== DATA CANDLE ===================== */
 
 async function loadCandles(symbol,granularity){
  if(!market||market.readyState!==WebSocket.OPEN){
@@ -938,12 +869,11 @@ async function loadCandles(symbol,granularity){
   end:"latest"
  },20000);
 
+ if(result.error)throw Error(result.error.message);
  return result.candles||[];
 }
 
-/* =========================================================
-   PEMINDAIAN DAN AUTO ENTRY
-========================================================= */
+/* ===================== SCANNER DAN ENTRY ===================== */
 
 async function scanMarket(){
  if(!botOn||busy)return;
@@ -952,34 +882,36 @@ async function scanMarket(){
  try{
   if(!account||account.readyState!==WebSocket.OPEN||
      !market||market.readyState!==WebSocket.OPEN){
+   $("scannerStatus").textContent="Menunggu koneksi pulih.";
    log("Scanner menunggu koneksi pulih.");
    return;
   }
 
   if(buyUncertain){
-   log("Entry ditahan sampai status pembelian dipastikan.");
+   log("Entry ditahan: status BUY sebelumnya belum pasti.");
    await reconcileContracts();
    return;
   }
 
   if(selected.size===0){
-   log("Tidak ada instrumen yang dipilih.");
+   log("Tidak ada instrumen dipilih.");
    return;
   }
 
-  const timeframe=Number($("timeframe").value);
-  const bucket=Math.floor(Date.now()/1000/timeframe);
-
+  const tf=Number($("timeframe").value);
+  const bucket=Math.floor(Date.now()/1000/tf);
   if(bucket===lastBucket)return;
   lastBucket=bucket;
 
   const results=[];
-  const chosen=[...selected];
+  const list=[...selected];
 
-  for(const symbol of chosen){
+  $("scannerStatus").textContent="Menganalisis "+list.length+" instrumen...";
+
+  for(const symbol of list){
    if(!botOn)break;
    try{
-    const candles=await loadCandles(symbol,timeframe);
+    const candles=await loadCandles(symbol,tf);
     const analysis=analyzeCandles(candles);
     results.push({symbol,analysis});
    }catch(e){
@@ -987,22 +919,23 @@ async function scanMarket(){
      symbol,
      analysis:{side:"WAIT",score:0,reason:e.message}
     });
-    dbAddEvent("SCAN_ERROR",{symbol,message:e.message});
+    await dbAddEvent("SCAN_ERROR",{symbol,message:e.message});
    }
   }
 
   results.sort((a,b)=>b.analysis.score-a.analysis.score);
-
-  const host=$("scanResults");
-  host.innerHTML="";
+  $("scanResults").innerHTML="";
 
   for(const item of results){
-   const tag=document.createElement("span");
-   tag.className="pill";
-   tag.textContent=item.symbol+" : "+item.analysis.side+
+   const span=document.createElement("span");
+   span.className="pill";
+   span.textContent=item.symbol+" : "+item.analysis.side+
     " ("+item.analysis.score+")";
-   host.append(tag);
+   $("scanResults").append(span);
   }
+
+  $("scannerStatus").textContent=
+   "Analisis selesai. "+results.length+" instrumen diperiksa.";
 
   const candidate=results.find(x=>x.analysis.side!=="WAIT");
 
@@ -1010,7 +943,7 @@ async function scanMarket(){
    $("signal").textContent="WAIT";
    $("lastSymbol").textContent="--";
    log("Analisis selesai. Tidak ada sinyal valid.");
-   dbAddEvent("SCAN_NO_SIGNAL",{instruments:chosen.length});
+   await dbAddEvent("SCAN_NO_SIGNAL",{instruments:list.length});
    return;
   }
 
@@ -1039,6 +972,7 @@ async function scanMarket(){
   }
 
   await buyContract(candidate.symbol,candidate.analysis.side);
+
  }catch(e){
   log("Scanner error: "+e.message,"SCAN_ERROR");
  }finally{
@@ -1052,24 +986,18 @@ async function buyContract(symbol,side){
  if(!botOn||buyUncertain)return;
 
  if(!account||account.readyState!==WebSocket.OPEN){
-  await dbAddEvent("BUY_BLOCKED",{symbol,side,reason:"Akun tidak tersambung"});
+  await dbAddEvent("BUY_BLOCKED",{symbol,side,reason:"Akun terputus"});
   return;
  }
 
- if(active.size>=Number($("maxOpen").value)){
-  await dbAddEvent("BUY_BLOCKED",{symbol,side,reason:"Batas kontrak aktif"});
-  return;
- }
+ if(active.size>=Number($("maxOpen").value))return;
 
  const stake=Number($("stake").value);
  const duration=Number($("duration").value);
 
- if(!Number.isFinite(stake)||stake<=0){
-  throw Error("Stake tidak valid");
- }
+ if(!Number.isFinite(stake)||stake<=0)throw Error("Stake tidak valid");
 
  let proposal;
-
  try{
   const response=await rpc(account,{
    proposal:1,
@@ -1088,23 +1016,19 @@ async function buyContract(symbol,side){
   return;
  }
 
- if(!proposal||!proposal.id){
+ if(!proposal?.id){
   await dbAddEvent("PROPOSAL_UNAVAILABLE",{symbol,side,duration});
-  log("Kontrak tidak tersedia: "+symbol+" "+side+" "+duration+" menit.");
+  log("Kontrak tidak tersedia: "+symbol+" "+duration+" menit.");
   return;
  }
 
  let result;
-
  try{
-  result=await rpc(account,{
-   buy:proposal.id,
-   price:stake
-  },15000);
+  result=await rpc(account,{buy:proposal.id,price:stake},15000);
  }catch(e){
   buyUncertain=true;
   await dbAddEvent("BUY_UNCERTAIN",{symbol,side,message:e.message});
-  log("Status BUY belum pasti. Order ulang ditahan untuk mencegah transaksi ganda.");
+  log("BUY belum pasti. Pembelian ulang ditahan untuk mencegah order ganda.");
   await reconcileContracts();
   return;
  }
@@ -1114,14 +1038,14 @@ async function buyContract(symbol,side){
 
  if(!id){
   await dbAddEvent("BUY_FAILED",{symbol,side,response:result});
-  log("Respons pembelian tidak memiliki Contract ID.");
+  log("Respons BUY tidak memiliki Contract ID.");
   return;
  }
 
  const contract={
   contract_id:String(id),
-  symbol,
-  side,
+  underlying_symbol:symbol,
+  contract_type:side,
   buy_price:Number(bought.buy_price)||stake,
   status:"open",
   purchase_time:new Date().toISOString(),
@@ -1129,12 +1053,8 @@ async function buyContract(symbol,side){
  };
 
  active.set(String(id),{
-  id:String(id),
-  symbol,
-  side,
-  stake:contract.buy_price,
-  status:"OPEN",
-  seen:false
+  id:String(id),symbol,side,
+  stake:contract.buy_price,status:"OPEN",seen:false
  });
 
  await dbSaveContract(contract);
@@ -1142,7 +1062,6 @@ async function buyContract(symbol,side){
 
  updateStats();
  log("ENTRY BERHASIL "+side+" "+symbol+" | Contract ID "+id);
-
  await subscribeContract(id);
 }
 
@@ -1153,9 +1072,7 @@ function stopBot(reason="Dihentikan manual"){
  log("Entry baru dihentikan: "+reason+". Kontrak aktif tetap dipantau.");
 }
 
-/* =========================================================
-   PEMANTAUAN DAN PENYELESAIAN KONTRAK
-========================================================= */
+/* ===================== PEMANTAUAN KONTRAK ===================== */
 
 async function subscribeContract(id){
  if(!account||account.readyState!==WebSocket.OPEN)return;
@@ -1172,7 +1089,7 @@ async function subscribeContract(id){
 }
 
 function onContract(c){
- if(!c||!c.contract_id)return;
+ if(!c?.contract_id)return;
 
  const id=String(c.contract_id);
  let item=active.get(id);
@@ -1180,7 +1097,7 @@ function onContract(c){
  if(!item){
   item={
    id,
-   symbol:c.underlying||c.symbol||"?",
+   symbol:c.underlying_symbol||c.underlying||c.symbol||"?",
    side:c.contract_type||"?",
    stake:Number(c.buy_price)||0,
    status:"DIPULIHKAN",
@@ -1190,12 +1107,12 @@ function onContract(c){
  }
 
  item.status=c.status||item.status;
- item.symbol=c.underlying||c.symbol||item.symbol;
+ item.symbol=c.underlying_symbol||c.underlying||c.symbol||item.symbol;
  item.data=c;
 
  dbSaveContract({
   contract_id:id,
-  underlying:item.symbol,
+  underlying_symbol:item.symbol,
   contract_type:item.side,
   buy_price:c.buy_price,
   status:c.status,
@@ -1205,26 +1122,21 @@ function onContract(c){
   date_start:c.date_start,
   date_expiry:c.date_expiry,
   settled:!!(c.is_sold||c.status==="sold")
- }).catch(e=>log("Gagal menyimpan kontrak "+id+": "+e.message));
+ }).catch(e=>log("Gagal menyimpan kontrak: "+e.message));
 
- if(c.is_sold||c.status==="sold"){
-  settleContract(id,c);
- }else{
-  updateStats();
- }
+ if(c.is_sold||c.status==="sold")settleContract(id,c);
+ else updateStats();
 }
 
 async function settleContract(id,c){
  const item=active.get(id);
  if(item?.seen)return;
-
  if(item)item.seen=true;
 
  const profit=Number(c.profit)||0;
  const result=profit>0?"WIN":profit<0?"LOSS":"BREAKEVEN";
 
  active.delete(id);
-
  if(profit>0)wins++;
  else if(profit<0)losses++;
 
@@ -1233,10 +1145,9 @@ async function settleContract(id,c){
 
  const record={
   contract_id:id,
-  symbol:item?.symbol||c.underlying||"?",
+  symbol:item?.symbol||c.underlying_symbol||"?",
   side:item?.side||c.contract_type||"?",
-  result,
-  profit,
+  result,profit,
   buy_price:c.buy_price,
   sell_price:c.sell_price,
   entry_spot:c.entry_spot,
@@ -1250,27 +1161,23 @@ async function settleContract(id,c){
 
  await dbSaveContract(record);
  await dbAddEvent("CONTRACT_SETTLED",record);
-
  updateStats();
 
- log("KONTRAK "+result+" | ID "+id+
-  " | "+record.symbol+" | "+(profit>=0?"+":"")+profit.toFixed(2));
+ log("KONTRAK "+result+" | ID "+id+" | "+record.symbol+
+  " | "+(profit>=0?"+":"")+profit.toFixed(2));
 
  if(sessionProfit<=-Math.abs(Number($("maxLoss").value))){
   stopBot("Batas rugi sesi tercapai");
  }
 }
 
-/* =========================================================
-   REKONSILIASI KONTRAK
-========================================================= */
+/* ===================== REKONSILIASI ===================== */
 
 async function reconcileContracts(){
  if(!account||account.readyState!==WebSocket.OPEN)return;
 
  try{
   await dbAddEvent("RECONCILE_STARTED",{localActive:active.size});
-
   const response=await rpc(account,{portfolio:1},15000);
   const list=response.portfolio?.contracts||[];
 
@@ -1279,7 +1186,7 @@ async function reconcileContracts(){
    if(!active.has(id)){
     active.set(id,{
      id,
-     symbol:c.underlying||c.symbol||"?",
+     symbol:c.underlying_symbol||c.underlying||"?",
      stake:Number(c.buy_price)||0,
      status:"DIPULIHKAN",
      seen:false
@@ -1305,77 +1212,65 @@ async function reconcileContracts(){
 
 async function recoverSavedContracts(){
  if(!account||account.readyState!==WebSocket.OPEN)return;
-
  const rows=await dbGetAll("contracts");
 
  for(const row of rows){
   const c=row.data||{};
   const id=String(row.contract_id);
-
   if(c.settled||c.is_sold||c.status==="sold")continue;
 
   if(!active.has(id)){
    active.set(id,{
     id,
-    symbol:c.underlying||c.symbol||"?",
+    symbol:c.underlying_symbol||c.underlying||"?",
     side:c.contract_type||"?",
     stake:Number(c.buy_price)||0,
     status:"PEMULIHAN",
     seen:false
    });
   }
-
   await subscribeContract(id);
  }
-
  updateStats();
  log("Pemulihan kontrak tersimpan selesai.");
 }
 
-/* =========================================================
-   EKSPOR JURNAL
-========================================================= */
+/* ===================== EXPORT ===================== */
+
+function downloadFile(name,content,type){
+ const blob=new Blob([content],{type});
+ const url=URL.createObjectURL(blob);
+ const a=document.createElement("a");
+ a.href=url;a.download=name;
+ document.body.append(a);a.click();a.remove();
+ setTimeout(()=>URL.revokeObjectURL(url),3000);
+}
 
 async function exportJSON(){
  const events=await dbGetAll("events");
  const contracts=await dbGetAll("contracts");
  const meta=await dbGetAll("meta");
 
- const payload={
-  application:"DERIV AI BOT V21",
-  exported_at:new Date().toISOString(),
-  events,
-  contracts,
-  meta
- };
-
  downloadFile(
   "deriv-v21-journal-"+Date.now()+".json",
-  JSON.stringify(payload,null,2),
+  JSON.stringify({
+   application:"DERIV AI BOT V21",
+   exported_at:new Date().toISOString(),
+   events,contracts,meta
+  },null,2),
   "application/json"
  );
-
  dbAddEvent("JOURNAL_EXPORTED",{events:events.length,contracts:contracts.length});
 }
 
 async function exportCSV(){
  const events=await dbGetAll("events");
- const rows=[
-  ["ID","Waktu","Waktu WIB","Jenis","Data"]
- ];
-
+ const rows=[["ID","Waktu","WIB","Jenis","Data"]];
  for(const e of events){
-  rows.push([
-   e.id,
-   e.time,
-   e.wib,
-   e.type,
-   JSON.stringify(e.data||{})
-  ]);
+  rows.push([e.id,e.time,e.wib,e.type,JSON.stringify(e.data||{})]);
  }
-
- const csv=rows.map(row=>row.map(value=>
-  '"'+String(value??"").replace(/"/g,'""')+'"'
+ const csv=rows.map(row=>row.map(v=>
+  '"'+String(v??"").replace(/"/g,'""')+'"'
  ).join(",")).join("\r\n");
 
  downloadFile(
@@ -1383,25 +1278,10 @@ async function exportCSV(){
   "\uFEFF"+csv,
   "text/csv;charset=utf-8"
  );
-
  dbAddEvent("JOURNAL_CSV_EXPORTED",{events:events.length});
 }
 
-function downloadFile(name,content,type){
- const blob=new Blob([content],{type});
- const url=URL.createObjectURL(blob);
- const a=document.createElement("a");
- a.href=url;
- a.download=name;
- document.body.append(a);
- a.click();
- a.remove();
- setTimeout(()=>URL.revokeObjectURL(url),3000);
-}
-
-/* =========================================================
-   EVENT BROWSER DAN KEAMANAN
-========================================================= */
+/* ===================== EVENT BROWSER ===================== */
 
 window.addEventListener("online",()=>{
  log("Browser kembali online.","BROWSER_ONLINE");
@@ -1433,9 +1313,7 @@ window.addEventListener("beforeunload",()=>{
  dbAddEvent("PAGE_UNLOAD",{activeContracts:active.size});
 });
 
-/* =========================================================
-   TOMBOL DAN TIMER
-========================================================= */
+/* ===================== TOMBOL ===================== */
 
 $("connect").onclick=connectAll;
 $("disconnect").onclick=disconnectAll;
@@ -1447,12 +1325,10 @@ $("start").onclick=async()=>{
   log("Hubungkan akun DEMO dan data pasar terlebih dahulu.");
   return;
  }
-
  if(selected.size===0){
   log("Pilih minimal satu instrumen.");
   return;
  }
-
  if(botOn)return;
 
  botOn=true;
@@ -1491,17 +1367,13 @@ $("duration").onchange=()=>{
  dbAddEvent("DURATION_CHANGED",{value:$("duration").value});
 };
 
-$("exportJson").onclick=()=>{
- exportJSON().catch(e=>log("Export JSON gagal: "+e.message));
-};
-
-$("exportCsv").onclick=()=>{
- exportCSV().catch(e=>log("Export CSV gagal: "+e.message));
-};
+$("exportJson").onclick=()=>exportJSON().catch(e=>log("Export gagal: "+e.message));
+$("exportCsv").onclick=()=>exportCSV().catch(e=>log("Export CSV gagal: "+e.message));
 
 setInterval(()=>{
- $("clock").textContent=
-  new Date().toLocaleTimeString("id-ID",{timeZone:"Asia/Jakarta"});
+ $("clock").textContent=new Date().toLocaleTimeString(
+  "id-ID",{timeZone:"Asia/Jakarta"}
+ );
 },1000);
 
 scannerTimer=setInterval(()=>{
@@ -1514,9 +1386,7 @@ reconcileTimer=setInterval(()=>{
  }
 },30000);
 
-/* =========================================================
-   STARTUP
-========================================================= */
+/* ===================== STARTUP ===================== */
 
 (async()=>{
  try{
@@ -1536,5 +1406,5 @@ echo "========================================"
 echo " DERIV AI BOT V21 FULL INDEX BERHASIL"
 echo "========================================"
 echo "File dibuat: $(pwd)/index.html"
-echo "Backup lama disimpan jika sebelumnya ada."
-echo "Buka index.html melalui server lokal/hosting."
+echo "Backup lama dibuat jika file sebelumnya ada."
+echo "========================================"
