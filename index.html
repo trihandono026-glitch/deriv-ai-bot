@@ -1,0 +1,1708 @@
+<!doctype html>
+<html lang="id">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1">
+<title>DERIV AI BOT V25</title>
+<style>
+:root{--bg:#0b1020;--panel:#141c30;--panel2:#1a2540;--line:#2b3858;--txt:#edf2ff;--muted:#9aabc9;--green:#20c997;--red:#ff647c;--yellow:#ffc857;--blue:#6ea8fe}
+*{box-sizing:border-box}
+body{margin:0;background:linear-gradient(145deg,#0b1020,#101a30);color:var(--txt);font:14px system-ui,Arial,sans-serif}
+header{padding:18px 16px;background:#111a2d;border-bottom:1px solid var(--line)}
+h1{font-size:20px;margin:0}
+header small{color:var(--muted)}
+main{max-width:1050px;margin:auto;padding:14px;display:grid;gap:12px}
+.grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:14px;min-width:0}
+.panel h2{font-size:15px;margin:0 0 12px}
+.stats{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.stat{background:var(--panel2);padding:11px;border-radius:10px}
+.stat span{display:block;color:var(--muted);font-size:11px}
+.stat b{display:block;font-size:20px;margin-top:4px;overflow-wrap:anywhere}
+.positive{color:var(--green)}.negative{color:var(--red)}.muted{color:var(--muted)}
+label{display:block;color:var(--muted);font-size:12px;margin:9px 0 5px}
+input,select{width:100%;background:#0d1528;border:1px solid var(--line);border-radius:9px;color:var(--txt);padding:11px;font-size:14px;min-width:0}
+button{border:0;border-radius:9px;padding:11px 14px;font-weight:700;cursor:pointer;color:#07101f;background:var(--blue)}
+button:disabled{opacity:.45;cursor:not-allowed}
+.btnrow{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}
+.green{background:var(--green)}.red{background:var(--red)}.gray{background:#34415e;color:#fff}.yellow{background:var(--yellow)}
+.wide{width:100%}
+.pill{display:inline-block;padding:5px 9px;border-radius:99px;background:#263452;color:#cfe0ff;font-size:11px}
+.status{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.dot{width:8px;height:8px;border-radius:50%;background:var(--red);display:inline-block}
+.dot.on{background:var(--green)}
+.log{height:280px;overflow:auto;background:#080e1b;border:1px solid var(--line);border-radius:9px;padding:9px;font:11px/1.55 ui-monospace,monospace;white-space:pre-wrap;overflow-wrap:anywhere}
+.trade-table{width:100%;border-collapse:collapse;font-size:12px}
+.trade-table th,.trade-table td{text-align:left;padding:8px 5px;border-bottom:1px solid var(--line)}
+.trade-table th{color:var(--muted)}
+.hint{font-size:11px;color:var(--muted);line-height:1.5}
+.hidden{display:none!important}.full{grid-column:1/-1}
+.dangerbox{border:1px solid #824052;background:#351c2b;padding:10px;border-radius:9px;color:#ffdce3;font-size:12px;line-height:1.5}
+.okbox{border:1px solid #246b58;background:#12382f;padding:10px;border-radius:9px;color:#c9ffeb;font-size:12px;line-height:1.5}
+.clock{text-align:center;font-weight:800;font-size:15px;letter-spacing:.4px;padding:12px;color:#fff;background:#101a2d;border:1px solid var(--line);border-radius:12px}
+@media(max-width:700px){.grid{grid-template-columns:1fr}.stats{grid-template-columns:repeat(2,1fr)}}
+</style>
+</head>
+<body>
+<header>
+<h1>DERIV AI BOT V25</h1>
+<small>Adaptive CALL/PUT • Interval M1/M2/M5 • DEMO & REAL dengan konfirmasi</small>
+</header>
+
+<main>
+<div class="panel">
+  <div class="status">
+    <span class="dot" id="connDot"></span>
+    <b id="connText">Belum terhubung</b>
+    <span class="pill" id="modePill">DEMO</span>
+    <span class="pill" id="botPill">BOT STOP</span>
+    <span class="pill" id="balancePill">Saldo: --</span>
+  </div>
+  <p class="hint">V25 menggunakan satu instrumen pilihan. Bot mengevaluasi candle sesuai interval dan mencoba entry CALL/PUT berdasarkan aturan analisis internal. Batas risiko, kontrak aktif, koneksi, dan validasi proposal tetap berlaku.</p>
+</div>
+
+<div class="grid">
+<section class="panel">
+  <h2>1. Koneksi akun Deriv</h2>
+
+  <label>Mode akun</label>
+  <select id="accountMode">
+    <option value="demo">DEMO — akun latihan</option>
+    <option value="real">REAL — uang sungguhan</option>
+  </select>
+
+  <div id="realWarning" class="dangerbox hidden" style="margin-top:10px">
+    PERINGATAN AKUN REAL: transaksi menggunakan uang sungguhan. Bot tidak menjamin profit dan dapat menyebabkan seluruh stake hilang. Pastikan kamu memahami risiko sebelum melanjutkan.
+    <label style="color:#ffdce3">
+      <input id="realConfirm" type="checkbox" style="width:auto;margin-right:6px">
+      Saya memahami risiko dan secara sadar memilih akun REAL.
+    </label>
+  </div>
+
+  <label>App ID Deriv</label>
+  <input id="appId" type="text" inputmode="text" autocapitalize="off" spellcheck="false" autocomplete="off" placeholder="Masukkan App ID">
+
+  <label>Personal Access Token (PAT)</label>
+  <input id="token" type="password" autocomplete="off" placeholder="Tempel PAT sesuai mode akun">
+
+  <div class="btnrow">
+    <button class="green" id="connectBtn">HUBUNGKAN AKUN</button>
+    <button class="gray" id="disconnectBtn" disabled>PUTUSKAN</button>
+  </div>
+
+  <p class="hint">Gunakan PAT dengan izin yang diperlukan. Pilih mode akun yang sesuai dengan token. Bot tidak menyimpan PAT ke database atau log. Jangan membagikan PAT kepada siapa pun.</p>
+</section>
+
+<section class="panel">
+  <h2>2. Pilih instrumen sendiri</h2>
+
+  <label>Instrumen (satu pair saja)</label>
+  <select id="symbol" disabled>
+    <option>Hubungkan data pasar dahulu</option>
+  </select>
+
+  <label>Interval analisis</label>
+  <select id="timeframe">
+    <option value="1">M1 — evaluasi tiap 1 menit</option>
+    <option value="2">M2 — evaluasi tiap 2 menit</option>
+    <option value="5">M5 — evaluasi tiap 5 menit</option>
+  </select>
+
+  <label>Durasi kontrak</label>
+  <select id="duration">
+    <option value="1">1 menit</option>
+    <option value="2">2 menit</option>
+    <option value="5">5 menit</option>
+  </select>
+
+  <label>Stake per transaksi</label>
+  <input id="stake" type="number" min="0.35" step="0.01" value="1">
+
+  <div class="grid" style="gap:8px">
+    <div>
+      <label>Maks. kontrak aktif</label>
+      <input id="maxActive" type="number" min="1" max="10" value="2">
+    </div>
+    <div>
+      <label>Batas rugi sesi</label>
+      <input id="lossLimit" type="number" min="0.01" step="0.01" value="10">
+    </div>
+  </div>
+
+  <div class="btnrow">
+    <button class="yellow" id="checkBtn" disabled>CEK INSTRUMEN</button>
+  </div>
+
+  <p class="hint">Daftar instrumen dimuat dari Deriv. Tombol cek menguji proposal CALL untuk instrumen, stake, dan durasi yang dipilih. Proposal PUT divalidasi saat diperlukan.</p>
+</section>
+</div>
+
+<section class="panel">
+  <h2>3. Kontrol bot</h2>
+  <div class="btnrow">
+    <button class="green" id="startBtn" disabled>MULAI AUTO ENTRY</button>
+    <button class="red" id="stopBtn" disabled>STOP BOT</button>
+    <button class="gray" id="resetBtn">RESET STATISTIK SESI</button>
+    <button class="gray" id="exportBtn">EKSPOR CSV</button>
+  </div>
+
+  <p class="hint">STOP menghentikan entry baru dan mencoba menutup kontrak aktif yang masih dapat dijual. Kontrak yang tidak dapat dijual tetap dipantau sampai selesai. Penjualan lebih awal dapat menghasilkan kerugian dan harga penutupan dapat berubah.</p>
+  <div id="lockNotice" class="dangerbox hidden" style="margin-top:10px"></div>
+</section>
+
+<section class="panel">
+  <h2>4. Ringkasan sesi</h2>
+  <div class="stats">
+    <div class="stat"><span>Total trade</span><b id="total">0</b></div>
+    <div class="stat"><span>Kontrak aktif</span><b id="active">0</b></div>
+    <div class="stat"><span>WIN</span><b class="positive" id="wins">0</b></div>
+    <div class="stat"><span>LOSS</span><b class="negative" id="losses">0</b></div>
+    <div class="stat"><span>WIN RATE</span><b id="rate">0%</b></div>
+    <div class="stat"><span>Profit / Loss</span><b id="pnl">0.00</b></div>
+  </div>
+  <p class="hint" id="signalText" style="margin-top:12px">Belum ada analisis.</p>
+</section>
+
+<div class="clock" id="clockWib">--/--/---- --:--:-- WIB</div>
+
+<section class="panel">
+  <h2>5. Riwayat kontrak</h2>
+  <div style="overflow:auto">
+    <table class="trade-table">
+      <thead>
+        <tr>
+          <th>Waktu</th><th>Instrumen</th><th>Arah</th><th>Hasil</th><th>P/L</th><th>Contract ID</th>
+        </tr>
+      </thead>
+      <tbody id="tradeRows">
+        <tr><td colspan="6" class="muted">Belum ada transaksi.</td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<section class="panel">
+  <h2>6. Log aktivitas</h2>
+  <div class="log" id="logs"></div>
+  <div class="btnrow">
+    <button class="gray" id="clearViewBtn">BERSIHKAN TAMPILAN LOG</button>
+  </div>
+</section>
+
+<div class="dangerbox">
+  Peringatan risiko: strategi ini bukan jaminan profit. Skor dan label risiko merupakan penilaian teknis internal, bukan probabilitas menang. Tidak ada sistem yang dapat menjamin setiap entry menghasilkan keuntungan. Bot dapat berhenti karena batas risiko, data tidak valid, proposal ditolak, atau koneksi terputus. Jangan gunakan uang yang tidak siap kamu tanggung kerugiannya.
+</div>
+</main>
+
+<script>
+'use strict';
+
+const $=id=>document.getElementById(id);
+const API_BASE='https://api.derivws.com';
+const PUBLIC_WS='wss://api.derivws.com/trading/v1/options/ws/public';
+
+let publicWS=null,tradeWS=null,connected=false,botRunning=false,sessionLocked=false,buyUnconfirmed=false;
+let stopRequested=false,stopInProgress=false;
+let accountMode='demo',accountId=null;
+let symbols=[],activeContracts=new Map(),pendingBuy=false,lastCycleKey='';
+let requestSeq=10,pending=new Map(),contractSubs=new Map();
+let reconnectTimer=null,marketReconnectTimer=null,heartbeatTimer=null,scanTimer=null,reconnectInProgress=false;
+let chosenSymbol='';
+let db=null,logsCache=[],trades=new Map();
+let latestContractData=new Map(),closingContracts=new Set();
+let session={wins:0,losses:0,pnl:0,total:0};
+let sessionStart=Math.floor(Date.now()/1000);
+
+const reqId=()=>++requestSeq;
+
+function now(){
+ return new Date().toLocaleString('id-ID',{
+  timeZone:'Asia/Jakarta',
+  day:'2-digit',month:'2-digit',year:'numeric',
+  hour:'2-digit',minute:'2-digit',second:'2-digit',
+  hour12:false
+ })+' WIB';
+}
+
+function updateClock(){
+ const el=$('clockWib');
+ if(el)el.textContent=now();
+}
+setInterval(updateClock,1000);
+updateClock();
+
+function updateBalance(){
+ const el=$('balancePill');
+ if(!el)return;
+ const bal=Number(window.accountBalance);
+ el.textContent='Saldo: '+(Number.isFinite(bal)?bal.toFixed(2)+' '+(window.accountCurrency||''):'--');
+}
+
+function log(message){
+ const line=now()+' | '+message;
+ logsCache.unshift(line);
+ if(logsCache.length>500)logsCache.length=500;
+ $('logs').textContent=logsCache.join('\n');
+ if(db)dbPut('logs',{id:Date.now()+Math.random(),line}).catch(()=>{});
+}
+
+function setConn(ok,message){
+ connected=ok;
+ $('connDot').classList.toggle('on',ok);
+ $('connText').textContent=message;
+ $('startBtn').disabled=!ok||sessionLocked||botRunning||buyUnconfirmed;
+ $('checkBtn').disabled=!ok;
+ $('disconnectBtn').disabled=!ok;
+}
+
+function openDB(){
+ return new Promise((resolve,reject)=>{
+  const r=indexedDB.open('DerivAIBotV23',1);
+  r.onupgradeneeded=()=>{
+   const d=r.result;
+   if(!d.objectStoreNames.contains('trades'))d.createObjectStore('trades',{keyPath:'contract_id'});
+   if(!d.objectStoreNames.contains('logs'))d.createObjectStore('logs',{keyPath:'id'});
+   if(!d.objectStoreNames.contains('meta'))d.createObjectStore('meta',{keyPath:'key'});
+  };
+  r.onsuccess=()=>{db=r.result;resolve(db)};
+  r.onerror=()=>reject(r.error);
+ });
+}
+
+function store(name,mode='readonly'){
+ return db.transaction(name,mode).objectStore(name);
+}
+
+function dbPut(name,obj){
+ return new Promise((resolve,reject)=>{
+  const r=store(name,'readwrite').put(obj);
+  r.onsuccess=()=>resolve();
+  r.onerror=()=>reject(r.error);
+ });
+}
+
+function dbAll(name){
+ return new Promise((resolve,reject)=>{
+  const r=store(name).getAll();
+  r.onsuccess=()=>resolve(r.result||[]);
+  r.onerror=()=>reject(r.error);
+ });
+}
+
+async function restore(){
+ await openDB();
+
+ const meta=await new Promise((resolve,reject)=>{
+  const r=store('meta').get('sessionStart');
+  r.onsuccess=()=>resolve(r.result);
+  r.onerror=()=>reject(r.error);
+ });
+
+ if(meta?.value)sessionStart=meta.value;
+ else await dbPut('meta',{key:'sessionStart',value:sessionStart});
+
+ const rows=await dbAll('trades');
+ for(const t of rows)trades.set(String(t.contract_id),t);
+
+ const logs=await dbAll('logs');
+ logs.sort((a,b)=>b.id-a.id);
+ logsCache=logs.slice(0,300).map(x=>x.line);
+ $('logs').textContent=logsCache.join('\n');
+
+ recalc();
+ renderTrades();
+ log('Jurnal dipulihkan: '+trades.size+' kontrak unik.');
+}
+
+function recalc(){
+ const arr=[...trades.values()].filter(t=>
+  (t.status==='won'||t.status==='lost')&&
+  Number(t.purchase_time||0)>=sessionStart
+ );
+
+ session.total=arr.length;
+ session.wins=arr.filter(t=>t.status==='won').length;
+ session.losses=arr.filter(t=>t.status==='lost').length;
+ session.pnl=arr.reduce((a,t)=>a+(Number(t.profit)||0),0);
+
+ $('total').textContent=session.total;
+ $('wins').textContent=session.wins;
+ $('losses').textContent=session.losses;
+ $('rate').textContent=(session.total?session.wins/session.total*100:0).toFixed(1)+'%';
+ $('pnl').textContent=session.pnl.toFixed(2);
+ $('pnl').className=session.pnl>=0?'positive':'negative';
+ $('active').textContent=activeContracts.size;
+}
+
+function esc(s){
+ return String(s).replace(/[&<>"']/g,c=>({
+  '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'
+ }[c]));
+}
+
+function renderTrades(){
+ const arr=[...trades.values()]
+  .sort((a,b)=>(b.purchase_time||0)-(a.purchase_time||0))
+  .slice(0,60);
+
+ $('tradeRows').innerHTML=arr.length?arr.map(t=>`
+ <tr>
+  <td>${esc(t.time||'-')}</td>
+  <td>${esc(t.symbol||'-')}</td>
+  <td>${esc(t.direction||'-')}</td>
+  <td>${t.status==='won'?'<span class="positive">WIN</span>':t.status==='lost'?'<span class="negative">LOSS</span>':'AKTIF'}</td>
+  <td class="${Number(t.profit)>=0?'positive':'negative'}">${Number(t.profit||0).toFixed(2)}</td>
+  <td>${esc(String(t.contract_id))}</td>
+ </tr>`).join(''):'<tr><td colspan="6" class="muted">Belum ada transaksi.</td></tr>';
+}
+
+function wsSend(ws,obj){
+ if(!ws||ws.readyState!==WebSocket.OPEN)throw Error('WebSocket belum siap');
+ ws.send(JSON.stringify(obj));
+}
+
+function fetchWithTimeout(url,options,timeout=30000,label='HTTP'){
+ const controller=new AbortController();
+ const timer=setTimeout(()=>controller.abort(),timeout);
+
+ return fetch(url,{...options,signal:controller.signal})
+ .catch(e=>{
+  if(e.name==='AbortError')throw Error(label+': server tidak merespons dalam '+Math.round(timeout/1000)+' detik');
+  throw e;
+ })
+ .finally(()=>clearTimeout(timer));
+}
+
+function waitResponse(ws,payload,timeout=20000){
+ return new Promise((resolve,reject)=>{
+  if(!ws||ws.readyState!==WebSocket.OPEN){
+   reject(Error('WebSocket tidak terbuka'));
+   return;
+  }
+
+  const id=reqId();
+  const command=Object.keys(payload).find(k=>k!=='req_id')||'API';
+
+  const timer=setTimeout(()=>{
+   pending.delete(id);
+   reject(Error('Timeout '+command+' setelah '+Math.round(timeout/1000)+' detik (req_id '+id+')'));
+  },timeout);
+
+  pending.set(id,{resolve,reject,timer,ws,command});
+
+  try{
+   wsSend(ws,{...payload,req_id:id,passthrough:{client_req_id:id}});
+  }catch(e){
+   clearTimeout(timer);
+   pending.delete(id);
+   reject(e);
+  }
+ });
+}
+
+function routeMessage(data,ws){
+ const candidates=[
+  data?.req_id,
+  data?.passthrough?.client_req_id,
+  data?.echo_req?.req_id,
+  data?.echo_req?.passthrough?.client_req_id
+ ];
+
+ let id=null;
+ for(const raw of candidates){
+  if(raw===undefined||raw===null||raw==='')continue;
+  const n=Number(raw);
+  if(Number.isFinite(n)&&pending.has(n)){id=n;break}
+ }
+
+ if(id===null)return false;
+
+ const p=pending.get(id);
+ if(p.ws!==ws)return false;
+
+ pending.delete(id);
+ clearTimeout(p.timer);
+
+ if(data.error){
+  p.reject(Error(p.command+': '+(data.error.code||'API_ERROR')+' - '+(data.error.message||'Permintaan ditolak')));
+ }else{
+  p.resolve(data);
+ }
+ return true;
+}
+
+async function requestWithRetry(ws,payload,options={}){
+ const timeout=options.timeout??20000;
+ const retries=options.retries??2;
+ const label=options.label||Object.keys(payload)[0]||'API';
+ let lastError;
+
+ for(let attempt=0;attempt<=retries;attempt++){
+  try{
+   if(attempt)log(label+': mencoba ulang ('+attempt+'/'+retries+').');
+   return await waitResponse(ws,payload,timeout);
+  }catch(e){
+   lastError=e;
+   const isTimeout=/Timeout/i.test(e.message||'');
+   if(!isTimeout||attempt===retries||!ws||ws.readyState!==WebSocket.OPEN)break;
+   await new Promise(resolve=>setTimeout(resolve,700*(attempt+1)));
+  }
+ }
+ throw lastError||Error(label+': permintaan gagal');
+}
+
+function rejectPendingForSocket(ws,reason){
+ for(const [id,p] of pending){
+  if(p.ws!==ws)continue;
+  clearTimeout(p.timer);
+  pending.delete(id);
+  p.reject(Error(reason));
+ }
+}
+
+function startHeartbeat(ws){
+ clearInterval(heartbeatTimer);
+ heartbeatTimer=setInterval(async()=>{
+  if(ws!==tradeWS||ws.readyState!==WebSocket.OPEN)return;
+  if([...pending.values()].some(p=>p.ws===ws))return;
+  try{
+   await waitResponse(ws,{ping:1},15000);
+  }catch(e){
+   log('HEARTBEAT akun gagal: '+e.message);
+   try{ws.close()}catch{}
+  }
+ },30000);
+}
+
+/* MODE AKUN DAN KONEKSI */
+
+$('accountMode').addEventListener('change',()=>{
+ const mode=$('accountMode').value;
+ $('realWarning').classList.toggle('hidden',mode!=='real');
+ $('realConfirm').checked=false;
+ if(connected){
+  alert('Putuskan koneksi terlebih dahulu sebelum mengganti mode akun.');
+  $('accountMode').value=accountMode;
+  $('realWarning').classList.toggle('hidden',accountMode!=='real');
+ }
+});
+
+async function connectAll(){
+ const app=$('appId').value.trim();
+ const token=$('token').value.trim();
+ const requestedMode=$('accountMode').value;
+
+ if(!app||!token){
+  alert('Masukkan App ID dan PAT.');
+  return;
+ }
+
+ if(!/^[A-Za-z0-9_-]{3,128}$/.test(app)){
+  alert('Format App ID tidak valid.');
+  return;
+ }
+
+ if(requestedMode==='real'){
+  if(!$('realConfirm').checked){
+   alert('Centang konfirmasi risiko REAL terlebih dahulu.');
+   return;
+  }
+  if(!confirm('Kamu akan menghubungkan akun REAL dan bot dapat membuka transaksi dengan uang sungguhan. Lanjutkan?')){
+   return;
+  }
+ }
+
+ if(botRunning||pendingBuy){
+  alert('Hentikan bot dan pastikan tidak ada proses entry sebelum mengganti koneksi.');
+  return;
+ }
+
+ $('connectBtn').disabled=true;
+ $('connectBtn').textContent='MENGHUBUNGKAN...';
+
+ accountMode=requestedMode;
+
+ try{
+  const headers={
+   'Authorization':'Bearer '+token,
+   'Deriv-App-ID':app,
+   'Accept':'application/json'
+  };
+
+  const listRes=await fetchWithTimeout(
+   API_BASE+'/trading/v1/options/accounts',
+   {method:'GET',headers},
+   30000,
+   'DAFTAR AKUN'
+  );
+
+  let listBody={};
+  try{listBody=await listRes.json()}catch{}
+
+  if(!listRes.ok){
+   throw Error(listBody?.errors?.[0]?.message||listBody?.error?.message||'Gagal membaca akun ('+listRes.status+')');
+  }
+
+  let accounts=[];
+  const d=listBody?.data;
+
+  if(Array.isArray(d))accounts=d;
+  else if(Array.isArray(d?.accounts))accounts=d.accounts;
+  else if(Array.isArray(listBody?.accounts))accounts=listBody.accounts;
+  else if(d&&typeof d==='object')accounts=[d];
+
+  const matching=accounts.filter(a=>
+   String(a.account_type||a.type||'').toLowerCase()===requestedMode&&
+   String(a.status||'active').toLowerCase()==='active'
+  );
+
+  if(!matching.length){
+   throw Error('Akun '+requestedMode.toUpperCase()+' aktif tidak ditemukan. Periksa PAT dan mode akun.');
+  }
+
+  const account=String(matching[0].account_id||matching[0].id||'');
+  if(!account)throw Error('Account ID tidak tersedia dari API.');
+
+  accountId=account;
+  log('Akun '+requestedMode.toUpperCase()+' ditemukan: '+account+'. Meminta koneksi aman.');
+
+  const res=await fetchWithTimeout(
+   API_BASE+'/trading/v1/options/accounts/'+encodeURIComponent(account)+'/otp',
+   {
+    method:'POST',
+    headers:{...headers,'Content-Type':'application/json'}
+   },
+   30000,
+   'OTP AKUN'
+  );
+
+  let body={};
+  try{body=await res.json()}catch{}
+
+  const wsUrl=body?.data?.url;
+  if(!res.ok||!wsUrl){
+   throw Error(body?.errors?.[0]?.message||body?.error?.message||body?.message||'OTP gagal.');
+  }
+
+  const expectedPath=requestedMode==='real'?/\/ws\/real(?:\?|$)/i:/\/ws\/demo(?:\?|$)/i;
+  if(!expectedPath.test(wsUrl)){
+   throw Error('Keamanan akun: alamat WebSocket tidak sesuai dengan mode '+requestedMode.toUpperCase()+'. Koneksi dibatalkan.');
+  }
+
+  const ws=new WebSocket(wsUrl);
+  tradeWS=ws;
+
+  await new Promise((resolve,reject)=>{
+   const timer=setTimeout(()=>reject(Error('Timeout koneksi akun')),15000);
+   ws.onopen=()=>{clearTimeout(timer);resolve()};
+   ws.onerror=()=>{clearTimeout(timer);reject(Error('WebSocket akun gagal'))};
+  });
+
+  ws.onmessage=e=>{
+   try{onTradeMessage(JSON.parse(e.data),ws)}
+   catch(err){log('Pesan akun tidak dapat dibaca: '+err.message)}
+  };
+
+  startHeartbeat(ws);
+
+  ws.onclose=()=>{
+   clearInterval(heartbeatTimer);
+   rejectPendingForSocket(ws,'Koneksi akun terputus');
+   if(ws===tradeWS&&connected){
+    setConn(false,'Koneksi akun terputus');
+    log('Koneksi akun terputus. Entry baru dihentikan; kontrak tetap perlu dipantau.');
+    if(botRunning)scheduleReconnect();
+   }
+  };
+
+  const bal=await requestWithRetry(
+   ws,{balance:1,subscribe:1},
+   {timeout:25000,retries:2,label:'SALDO AKUN'}
+  );
+
+  const b=bal.balance||{};
+  window.accountCurrency=b.currency||matching[0].currency||'USD';
+  window.accountBalance=Number(b.balance??matching[0].balance??0);
+
+  $('modePill').textContent=requestedMode.toUpperCase()+' '+window.accountCurrency;
+  updateBalance();
+  setConn(true,'Akun '+requestedMode.toUpperCase()+' terhubung');
+
+  log('Akun '+requestedMode.toUpperCase()+' '+account+' berhasil terhubung. Saldo '+window.accountBalance.toFixed(2)+' '+window.accountCurrency+'.');
+
+  await connectPublic();
+  await refreshPortfolio();
+
+  $('connectBtn').disabled=false;
+  $('connectBtn').textContent='TERHUBUNG';
+
+  /* Token dihapus dari kolom setelah koneksi berhasil. */
+  $('token').value='';
+
+ }catch(e){
+  $('connectBtn').disabled=false;
+  $('connectBtn').textContent='HUBUNGKAN AKUN';
+  setConn(false,'Gagal terhubung');
+  log('KONEKSI ERROR: '+e.message);
+  alert(e.message);
+ }
+}
+
+/* DATA PASAR */
+
+async function connectPublic(){
+ if(publicWS&&publicWS.readyState===WebSocket.OPEN&&symbols.length)return;
+
+ const ws=new WebSocket(PUBLIC_WS);
+ publicWS=ws;
+
+ await new Promise((resolve,reject)=>{
+  const t=setTimeout(()=>reject(Error('Timeout membuka koneksi data pasar')),15000);
+  ws.onopen=()=>{clearTimeout(t);resolve()};
+  ws.onerror=()=>{clearTimeout(t);reject(Error('WebSocket data pasar gagal'))};
+  ws.onclose=()=>{
+   rejectPendingForSocket(ws,'Koneksi data pasar terputus');
+   if(ws===publicWS){
+    chosenSymbol=$('symbol').value||chosenSymbol;
+    $('symbol').disabled=true;
+    $('symbol').innerHTML='<option value="">Koneksi data pasar terputus</option>';
+    log('Koneksi data pasar terputus.');
+    if(botRunning)scheduleMarketReconnect();
+   }
+  };
+ });
+
+ ws.onmessage=e=>{
+  let d;
+  try{d=JSON.parse(e.data)}catch{return}
+  if(routeMessage(d,ws))return;
+  if(d.error)log('DATA PASAR ERROR: '+(d.error.message||'Permintaan ditolak'));
+ };
+
+ ws.onerror=()=>{
+  rejectPendingForSocket(ws,'WebSocket data pasar mengalami error');
+  log('WebSocket data pasar mengalami error.');
+ };
+
+ let response;
+ try{
+  response=await requestWithRetry(
+   ws,{active_symbols:'full'},
+   {timeout:25000,retries:2,label:'DAFTAR INSTRUMEN'}
+  );
+ }catch(e){
+  $('symbol').disabled=true;
+  $('symbol').innerHTML='<option value="">Gagal memuat instrumen</option>';
+  throw e;
+ }
+
+ const list=Array.isArray(response.active_symbols)?response.active_symbols:[];
+ symbols=list
+  .filter(x=>x&&x.underlying_symbol&&Number(x.is_trading_suspended)!==1)
+  .map(x=>({
+   ...x,
+   symbol:String(x.underlying_symbol),
+   display_name:String(x.underlying_symbol_name||x.underlying_symbol)
+  }))
+  .sort((a,b)=>a.display_name.localeCompare(b.display_name));
+
+ const sel=$('symbol');
+ const old=chosenSymbol||sel.value;
+
+ if(!symbols.length){
+  sel.disabled=true;
+  sel.innerHTML='<option value="">Tidak ada instrumen</option>';
+  throw Error('Server tidak mengirim daftar instrumen.');
+ }
+
+ sel.innerHTML='<option value="">-- Pilih instrumen --</option>'+
+  symbols.map(x=>'<option value="'+esc(x.symbol)+'">'+esc(x.display_name)+' ('+esc(x.symbol)+')</option>').join('');
+
+ if(old&&symbols.some(x=>x.symbol===old))sel.value=old;
+ else sel.selectedIndex=0;
+
+ chosenSymbol=sel.value;
+ sel.disabled=false;
+
+ log('DATA PASAR SIAP: '+symbols.length+' instrumen tersedia.');
+}
+
+/* PESAN AKUN DAN KONTRAK */
+
+function onTradeMessage(d,ws){
+ if(routeMessage(d,ws))return;
+
+ if(d.error){
+  log('API ERROR: '+d.error.message);
+  return;
+ }
+
+ if(d.msg_type==='balance'&&d.balance){
+  window.accountBalance=Number(d.balance.balance);
+  window.accountCurrency=d.balance.currency||window.accountCurrency||'USD';
+  updateBalance();
+  return;
+ }
+
+ if(d.msg_type==='proposal_open_contract'&&d.proposal_open_contract){
+  handleContract(d.proposal_open_contract).catch(e=>log('GAGAL MENYIMPAN KONTRAK: '+e.message));
+ }
+
+ if(d.msg_type==='portfolio'&&d.portfolio){
+  const list=d.portfolio.contracts||[];
+  for(const c of list){
+   if(c.contract_id)monitorContract(c.contract_id);
+  }
+  recalc();
+ }
+}
+
+async function refreshPortfolio(){
+ if(!tradeWS||tradeWS.readyState!==WebSocket.OPEN)return null;
+
+ try{
+  const r=await requestWithRetry(
+   tradeWS,{portfolio:1},
+   {timeout:20000,retries:2,label:'PORTFOLIO'}
+  );
+
+  const list=r.portfolio?.contracts||[];
+
+  for(const c of list){
+   if(!c.contract_id)continue;
+
+   const id=String(c.contract_id);
+
+   if(!trades.has(id)){
+    const row={
+     contract_id:id,
+     symbol:c.underlying||c.underlying_symbol||'UNKNOWN',
+     direction:String(c.contract_type||'').includes('PUT')?'PUT':'CALL',
+     status:'open',
+     profit:Number(c.profit||0),
+     purchase_time:c.purchase_time||Date.now()/1000,
+     time:now()
+    };
+
+    trades.set(id,row);
+    await dbPut('trades',row);
+   }
+
+   activeContracts.set(id,trades.get(id));
+   monitorContract(id);
+  }
+
+  log('Rekonsiliasi portfolio selesai. Kontrak aktif: '+list.length);
+  recalc();
+  renderTrades();
+  return list;
+
+ }catch(e){
+  log('Rekonsiliasi portfolio gagal: '+e.message);
+  return null;
+ }
+}
+
+function monitorContract(id){
+ id=String(id);
+ if(contractSubs.has(id))return;
+ if(!tradeWS||tradeWS.readyState!==WebSocket.OPEN)return;
+
+ contractSubs.set(id,true);
+
+ try{
+  wsSend(tradeWS,{
+   proposal_open_contract:1,
+   contract_id:Number(id),
+   subscribe:1,
+   req_id:reqId()
+  });
+ }catch(e){
+  contractSubs.delete(id);
+  log('Gagal memantau kontrak '+id+': '+e.message);
+ }
+}
+
+async function handleContract(c){
+ const id=String(c.contract_id||'');
+ if(!id)return;
+
+ latestContractData.set(id,c);
+
+ const symbol=c.underlying||c.underlying_symbol||trades.get(id)?.symbol||'UNKNOWN';
+
+ const old=trades.get(id)||{
+  contract_id:id,
+  symbol,
+  direction:c.contract_type||'?',
+  purchase_time:c.purchase_time||Date.now()/1000,
+  time:now(),
+  status:'open',
+  profit:0
+ };
+
+ old.symbol=symbol;
+ old.direction=String(c.contract_type||old.direction).includes('PUT')?'PUT':'CALL';
+
+ /* Profit adalah nilai P/L kontrak, bukan payout atau sell_price. */
+ if(c.profit!==undefined&&c.profit!==null){
+  old.profit=Number(c.profit);
+ }
+
+ const isFinal=Boolean(
+  c.is_sold||
+  c.status==='sold'||
+  c.status==='won'||
+  c.status==='lost'||
+  c.is_expired
+ );
+
+ if(isFinal){
+  const finalProfit=Number(c.profit??old.profit??0);
+  old.profit=Number.isFinite(finalProfit)?finalProfit:0;
+  old.status=old.profit>0?'won':'lost';
+  old.closed_time=Date.now();
+  old.result_source='Deriv proposal_open_contract';
+
+  if(!old._logged){
+   old._logged=true;
+   log(
+    'KONTRAK '+old.status.toUpperCase()+
+    ' | ID '+id+
+    ' | '+symbol+
+    ' | P/L '+(old.profit>=0?'+':'')+old.profit.toFixed(2)
+   );
+  }
+
+  activeContracts.delete(id);
+  closingContracts.delete(id);
+  contractSubs.delete(id);
+
+  try{
+   if(c.subscription?.id)wsSend(tradeWS,{forget:c.subscription.id});
+  }catch{}
+
+  trades.set(id,old);
+  await dbPut('trades',old);
+  recalc();
+  renderTrades();
+  checkRiskLock();
+
+ }else{
+  old.status='open';
+  trades.set(id,old);
+  activeContracts.set(id,old);
+  await dbPut('trades',old);
+  recalc();
+  renderTrades();
+
+  if(stopRequested&&!closingContracts.has(id)){
+   attemptCloseContract(id);
+  }
+ }
+}
+
+/* STOP DAN PENUTUPAN KONTRAK */
+
+function stopBot(reason='Tombol STOP ditekan.',options={}){
+ const closeContracts=options.closeContracts!==false;
+
+ /* Flag dipasang langsung sebelum proses async lainnya. */
+ stopRequested=true;
+ botRunning=false;
+
+ clearTimeout(scanTimer);
+ clearTimeout(marketReconnectTimer);
+
+ $('botPill').textContent='BOT STOP';
+ $('startBtn').disabled=!connected||sessionLocked||buyUnconfirmed;
+ $('stopBtn').disabled=true;
+
+ log('ENTRY BARU DIHENTIKAN: '+reason);
+
+ if(closeContracts){
+  log('STOP: memeriksa kontrak aktif untuk kemungkinan penutupan lebih awal.');
+  closeAllActiveContracts();
+ }else{
+  log('Kontrak aktif tidak dijual otomatis. Pemantauan tetap dilanjutkan jika koneksi tersedia.');
+ }
+}
+
+async function closeAllActiveContracts(){
+ if(stopInProgress)return;
+ stopInProgress=true;
+
+ try{
+  const ids=[...activeContracts.keys()];
+
+  if(!ids.length){
+   log('STOP: tidak ada kontrak aktif yang tercatat untuk ditutup.');
+   return;
+  }
+
+  log('STOP: pemeriksaan penutupan '+ids.length+' kontrak aktif.');
+
+  for(const id of ids){
+   await attemptCloseContract(id);
+  }
+
+ }finally{
+  stopInProgress=false;
+ }
+}
+
+async function attemptCloseContract(id){
+ id=String(id);
+
+ if(closingContracts.has(id))return;
+ if(!activeContracts.has(id))return;
+
+ if(!tradeWS||tradeWS.readyState!==WebSocket.OPEN){
+  log('PENUTUPAN DITUNDA | ID '+id+' | koneksi akun tidak tersedia. Kontrak tetap dipantau.');
+  return;
+ }
+
+ const current=latestContractData.get(id);
+
+ if(!current){
+  log('PENUTUPAN DITUNDA | ID '+id+' | menunggu data kontrak terbaru untuk memeriksa kelayakan jual.');
+  monitorContract(id);
+  return;
+ }
+
+ if(current.is_sold||current.is_expired||current.status==='sold'||current.status==='won'||current.status==='lost'){
+  await handleContract(current);
+  return;
+ }
+
+ if(current.is_valid_to_sell!==true){
+  log('KONTRAK BELUM BISA DIJUAL | ID '+id+' | tetap dipantau sampai penyelesaian.');
+  return;
+ }
+
+ closingContracts.add(id);
+ log('PERMINTAAN JUAL | ID '+id+' | kontrak dinyatakan dapat dijual oleh data terbaru.');
+
+ try{
+  /* Tidak melakukan retry SELL secara otomatis jika timeout. */
+  const result=await waitResponse(
+   tradeWS,
+   {sell:Number(id),price:0},
+   20000
+  );
+
+  if(result.sell){
+   log('PERMINTAAN JUAL DITERIMA DERIV | ID '+id+'. Menunggu konfirmasi hasil akhir.');
+  }else{
+   log('RESPONS JUAL TIDAK MEMUAT KONFIRMASI | ID '+id+'. Memeriksa status melalui portfolio.');
+  }
+
+  await refreshPortfolio();
+
+ }catch(e){
+  log('JUAL BELUM TERKONFIRMASI | ID '+id+' | '+e.message);
+  log('Tidak mengirim ulang SELL secara buta. Status kontrak akan diperiksa melalui pemantauan dan portfolio.');
+
+  await refreshPortfolio();
+
+ }finally{
+  closingContracts.delete(id);
+ }
+}
+
+/* PENGUNCI RISIKO */
+
+function checkRiskLock(){
+ const lim=Number($('lossLimit').value);
+
+ if(lim>0&&session.pnl<=-lim&&!sessionLocked){
+  sessionLocked=true;
+
+  $('lockNotice').textContent=
+   'ENTRY TERKUNCI: batas rugi sesi '+lim.toFixed(2)+
+   ' tercapai. Bot menghentikan entry dan mencoba menutup kontrak yang dapat dijual.';
+
+  $('lockNotice').classList.remove('hidden');
+
+  log('BATAS RUGI SESI TERCAPAI. Entry baru dihentikan.');
+  stopBot('Batas rugi sesi tercapai.');
+ }
+}
+
+/* ANALISIS */
+
+function calcEMA(vals,n){
+ if(vals.length<n)return null;
+ let e=vals.slice(0,n).reduce((a,b)=>a+b,0)/n;
+ const k=2/(n+1);
+ for(let i=n;i<vals.length;i++)e=vals[i]*k+e*(1-k);
+ return e;
+}
+
+function rsi(vals,n=14){
+ if(vals.length<n+1)return 50;
+ let g=0,l=0;
+
+ for(let i=vals.length-n;i<vals.length;i++){
+  const d=vals[i]-vals[i-1];
+  if(d>0)g+=d;
+  else l-=d;
+ }
+
+ if(l===0)return 100;
+ return 100-100/(1+g/l);
+}
+
+function analyze(cs){
+ if(!Array.isArray(cs)||cs.length<20){
+  return {side:'CALL',score:0,reason:'Data terbatas',risk:'TINGGI'};
+ }
+
+ const close=cs.map(x=>Number(x.close));
+ const high=cs.map(x=>Number(x.high));
+ const low=cs.map(x=>Number(x.low));
+
+ if(close.some(x=>!Number.isFinite(x))){
+  return {side:'CALL',score:0,reason:'Data harga tidak lengkap',risk:'TINGGI'};
+ }
+
+ const e9=calcEMA(close,9);
+ const e21=calcEMA(close,21);
+ const rr=rsi(close);
+ const last=cs.at(-1);
+ const range=Number(last.high)-Number(last.low);
+ const body=Math.abs(close.at(-1)-Number(last.open));
+
+ const avgRange=cs.slice(-15,-1).reduce(
+  (a,x)=>a+Number(x.high)-Number(x.low),0
+ )/14;
+
+ let up=0,down=0,why=[];
+
+ if(e9>e21){
+  up++;
+  why.push('EMA pendek di atas EMA panjang');
+ }else if(e9<e21){
+  down++;
+  why.push('EMA pendek di bawah EMA panjang');
+ }
+
+ if(rr>=53&&rr<=75){
+  up++;
+  why.push('momentum naik');
+ }else if(rr<=47&&rr>=25){
+  down++;
+  why.push('momentum turun');
+ }
+
+ const priorHigh=Math.max(...high.slice(-21,-1));
+ const priorLow=Math.min(...low.slice(-21,-1));
+
+ if(close.at(-1)>priorHigh){
+  up+=2;
+  why.push('breakout batas atas');
+ }
+
+ if(close.at(-1)<priorLow){
+  down+=2;
+  why.push('breakdown batas bawah');
+ }
+
+ if(close.at(-1)>Number(last.open)&&body>range*.45){
+  up++;
+  why.push('candle menguat');
+ }else if(close.at(-1)<Number(last.open)&&body>range*.45){
+  down++;
+  why.push('candle melemah');
+ }
+
+ if(up===down){
+  if(close.at(-1)>e21)up++;
+  else if(close.at(-1)<e21)down++;
+  else if(close.at(-1)>=Number(last.open))up++;
+  else down++;
+
+  why.push('pemecah seri arah harga/candle');
+ }
+
+ const side=up>=down?'CALL':'PUT';
+ const score=Math.min(8,Math.max(up,down));
+ const extreme=avgRange>0&&range>avgRange*2.8;
+
+ return {
+  side,
+  score,
+  reason:why.join(', ')+(extreme?'; candle ekstrem':''),
+  risk:(score<4||extreme)?'TINGGI':score<6?'SEDANG':'LEBIH TERKONFIRMASI',
+  rsi:rr,
+  emaFast:e9,
+  emaSlow:e21
+ };
+}
+
+/* DATA CANDLE DAN PROPOSAL */
+
+async function getCandles(symbol,tf){
+ const payload={
+  ticks_history:symbol,
+  count:120,
+  end:'latest',
+  style:'candles',
+  granularity:Number(tf)*60
+ };
+
+ let r;
+
+ try{
+  if(!publicWS||publicWS.readyState!==WebSocket.OPEN||!symbols.length){
+   await connectPublic();
+  }
+
+  r=await requestWithRetry(
+   publicWS,payload,
+   {timeout:35000,retries:2,label:'DATA CANDLE '+symbol}
+  );
+
+ }catch(firstError){
+  const message=String(firstError?.message||firstError);
+
+  if(!/Timeout|terputus|WebSocket tidak terbuka|mengalami error/i.test(message)){
+   throw firstError;
+  }
+
+  log('DATA CANDLE: membuat koneksi data pasar baru sebelum mencoba kembali.');
+
+  const old=publicWS;
+  publicWS=null;
+  try{old?.close()}catch{}
+
+  await new Promise(resolve=>setTimeout(resolve,800));
+  await connectPublic();
+
+  r=await requestWithRetry(
+   publicWS,payload,
+   {timeout:35000,retries:1,label:'DATA CANDLE ULANG '+symbol}
+  );
+ }
+
+ const raw=r.candles||r.history?.candles;
+
+ if(!raw||raw.length<40){
+  throw Error('Respons candle kosong/tidak cukup (minimal 40 candle).');
+ }
+
+ const interval=Number(tf)*60;
+ const nowSec=Math.floor(Date.now()/1000);
+
+ const closed=raw.filter(c=>{
+  const t=Number(c.epoch||c.open_time||0);
+  return t>0&&t+interval<=nowSec;
+ });
+
+ if(closed.length<40){
+  throw Error('Candle yang sudah selesai belum cukup tersedia.');
+ }
+
+ return closed;
+}
+
+async function checkProposal(symbol,side,stake,duration){
+ const p=await requestWithRetry(
+  tradeWS,
+  {
+   proposal:1,
+   amount:stake,
+   basis:'stake',
+   contract_type:side,
+   currency:window.accountCurrency||'USD',
+   duration:Number(duration),
+   duration_unit:'m',
+   underlying_symbol:symbol
+  },
+  {timeout:25000,retries:2,label:'PROPOSAL '+side+' '+symbol}
+ );
+
+ if(!p.proposal?.id)throw Error('Proposal tidak mengembalikan ID');
+ return p.proposal;
+}
+
+async function checkSelected(){
+ const symbol=$('symbol').value;
+
+ if(!symbol){
+  alert('Pilih instrumen.');
+  return;
+ }
+
+ try{
+  const dur=$('duration').value;
+  const stake=Number($('stake').value);
+
+  if(!Number.isFinite(stake)||stake<=0)throw Error('Stake tidak valid.');
+
+  const a=await checkProposal(symbol,'CALL',stake,dur);
+
+  log('CEK DURASI BERHASIL: '+symbol+', CALL '+dur+' menit, ask '+(a.ask_price??'-')+'.');
+  alert('Proposal CALL tersedia untuk '+symbol+' selama '+dur+' menit.');
+
+ }catch(e){
+  log('Proposal tidak tersedia '+symbol+': '+e.message);
+  alert('Proposal tidak tersedia: '+e.message);
+ }
+}
+
+/* JADWAL ENTRY */
+
+function scheduleNextCycle(){
+ clearTimeout(scanTimer);
+ if(!botRunning||stopRequested)return;
+
+ const tf=Math.max(1,Number($('timeframe').value)||1);
+ const period=tf*60000;
+ const nowMs=Date.now();
+ const nextBoundary=(Math.floor(nowMs/period)+1)*period;
+ const delay=Math.max(250,nextBoundary-nowMs+1500);
+
+ scanTimer=setTimeout(async()=>{
+  if(!botRunning||stopRequested)return;
+  await cycle();
+  scheduleNextCycle();
+ },delay);
+}
+
+function scheduleMarketReconnect(){
+ clearTimeout(marketReconnectTimer);
+
+ marketReconnectTimer=setTimeout(async()=>{
+  if(!botRunning||stopRequested||!connected)return;
+
+  try{
+   log('Mencoba menyambungkan ulang data pasar...');
+   await connectPublic();
+   log('Data pasar tersambung kembali.');
+   scheduleNextCycle();
+  }catch(e){
+   log('RECONNECT DATA PASAR GAGAL: '+e.message);
+   scheduleMarketReconnect();
+  }
+ },5000);
+}
+
+async function resumeAfterVisibility(){
+ if(!botRunning||stopRequested)return;
+
+ if(!navigator.onLine){
+  log('Perangkat masih offline. AUTO ENTRY menunggu jaringan kembali.');
+  return;
+ }
+
+ if(!tradeWS||tradeWS.readyState!==WebSocket.OPEN){
+  scheduleReconnect();
+  return;
+ }
+
+ if(!publicWS||publicWS.readyState!==WebSocket.OPEN||!symbols.length){
+  scheduleMarketReconnect();
+  return;
+ }
+
+ log('Halaman aktif kembali. Koneksi diperiksa; menunggu jadwal candle.');
+ scheduleNextCycle();
+}
+
+document.addEventListener('visibilitychange',()=>{
+ if(document.visibilityState==='visible')resumeAfterVisibility();
+});
+
+window.addEventListener('pageshow',()=>resumeAfterVisibility());
+window.addEventListener('online',()=>{if(botRunning)resumeAfterVisibility()});
+window.addEventListener('offline',()=>{
+ if(botRunning)log('Jaringan perangkat terputus. Entry ditahan sampai jaringan pulih.');
+});
+
+/* PROSES ENTRY */
+
+async function cycle(){
+ if(!botRunning||stopRequested||!connected||pendingBuy||sessionLocked||buyUnconfirmed)return;
+
+ const symbol=$('symbol').value;
+ if(!symbol)return;
+
+ const tf=Number($('timeframe').value);
+ const dur=Number($('duration').value);
+ const stake=Number($('stake').value);
+ const max=Math.max(1,Math.min(10,Number($('maxActive').value)||1));
+
+ if(!Number.isFinite(stake)||stake<=0){
+  stopBot('Stake tidak valid.');
+  return;
+ }
+
+ const key=Math.floor(Date.now()/(tf*60000));
+ if(key===lastCycleKey)return;
+ lastCycleKey=key;
+
+ let stage='PENGAMBILAN CANDLE';
+
+ try{
+  const cs=await getCandles(symbol,tf);
+
+  if(!botRunning||stopRequested)return;
+
+  const latest=Number(cs.at(-1).epoch||cs.at(-1).open_time||0);
+
+  if(latest&&Date.now()/1000-latest>tf*60*2.5){
+   log('DATA TERTINGGAL '+symbol+': candle terakhir terlalu lama. Entry ditunda.');
+   return;
+  }
+
+  stage='ANALISIS SINYAL';
+
+  const s=analyze(cs);
+  const risk=s.risk||'TINGGI';
+
+  $('signalText').textContent=
+   symbol+' | '+s.side+
+   ' | skor '+s.score+'/8'+
+   ' | risiko '+risk+
+   ' | '+s.reason+
+   (s.rsi?' | RSI '+s.rsi.toFixed(1):'');
+
+  log(
+   'EVALUASI '+symbol+
+   ' | '+s.side+
+   ' | skor '+s.score+'/8'+
+   ' | risiko '+risk+
+   ' | '+s.reason
+  );
+
+  if(activeContracts.size>=max){
+   log('ENTRY DITAHAN '+symbol+': batas kontrak aktif tercapai ('+activeContracts.size+'/'+max+').');
+   return;
+  }
+
+  pendingBuy=true;
+
+  stage='MEMINTA PROPOSAL '+s.side;
+
+  let proposal;
+
+  try{
+   proposal=await checkProposal(symbol,s.side,stake,dur);
+  }catch(e){
+   log('PROPOSAL GAGAL '+symbol+' '+s.side+': '+e.message);
+   return;
+  }
+
+  /* STOP dapat terjadi saat menunggu proposal. */
+  if(!botRunning||stopRequested||!connected||sessionLocked)return;
+
+  if(activeContracts.size>=max){
+   log('ENTRY DITAHAN: batas kontrak aktif tercapai setelah proposal.');
+   return;
+  }
+
+  stage='MENGIRIM BUY '+s.side;
+
+  const knownBefore=new Set(activeContracts.keys());
+  let buy;
+
+  try{
+   /* BUY tidak di-retry otomatis untuk mencegah transaksi ganda. */
+   buy=await waitResponse(
+    tradeWS,
+    {buy:proposal.id,price:Number(proposal.ask_price)},
+    30000
+   );
+
+  }catch(e){
+   log('BUY BELUM TERKONFIRMASI '+symbol+' '+s.side+': '+e.message);
+   log('Memeriksa portfolio. Pembelian tidak dikirim ulang otomatis.');
+
+   let found=false;
+
+   for(let attempt=1;attempt<=4;attempt++){
+    await new Promise(resolve=>setTimeout(resolve,1500*attempt));
+
+    const list=await refreshPortfolio();
+
+    if(Array.isArray(list)&&list.some(c=>
+     c.contract_id&&!knownBefore.has(String(c.contract_id))
+    )){
+     found=true;
+     log('KONTRAK BARU ditemukan melalui rekonsiliasi portfolio.');
+     break;
+    }
+
+    if(attempt<4){
+     log('Portfolio belum menunjukkan kontrak baru (pemeriksaan '+attempt+'/4).');
+    }
+   }
+
+   if(!found){
+    buyUnconfirmed=true;
+    stopBot('Status BUY belum pasti. Auto-entry dikunci untuk mencegah transaksi ganda.');
+    log('STATUS BUY BELUM PASTI. Periksa portfolio akun secara manual.');
+   }
+
+   return;
+  }
+
+  const c=buy.buy;
+
+  if(!c?.contract_id){
+   throw Error('Respons BUY tidak memiliki Contract ID.');
+  }
+
+  const id=String(c.contract_id);
+
+  if(!trades.has(id)){
+   const row={
+    contract_id:id,
+    symbol,
+    direction:s.side,
+    status:'open',
+    profit:0,
+    purchase_time:c.purchase_time||Date.now()/1000,
+    time:now(),
+    stake,
+    score:s.score,
+    risk,
+    reason:s.reason,
+    account_mode:accountMode
+   };
+
+   trades.set(id,row);
+   activeContracts.set(id,row);
+   await dbPut('trades',row);
+
+   log(
+    'ENTRY BERHASIL '+s.side+' '+symbol+
+    ' | akun '+accountMode.toUpperCase()+
+    ' | risiko '+risk+
+    ' | Contract ID '+id
+   );
+
+   renderTrades();
+   recalc();
+   monitorContract(id);
+
+   /* Jika STOP ditekan ketika BUY sedang diproses, segera cek penutupan. */
+   if(stopRequested){
+    log('BUY selesai setelah STOP diminta. Kontrak '+id+' akan diperiksa untuk penutupan.');
+    attemptCloseContract(id);
+   }
+
+  }else{
+   log('BUY diabaikan: Contract ID sudah tercatat '+id);
+  }
+
+ }catch(e){
+  log('ANALISIS/ENTRY ERROR pada tahap '+stage+': '+e.message);
+
+ }finally{
+  pendingBuy=false;
+
+  if(stopRequested){
+   $('botPill').textContent='BOT STOP';
+   $('startBtn').disabled=!connected||sessionLocked||buyUnconfirmed;
+   $('stopBtn').disabled=true;
+  }
+ }
+}
+
+function startBot(){
+ if(buyUnconfirmed){
+  alert('Auto-entry dikunci karena status BUY sebelumnya belum pasti. Periksa portfolio terlebih dahulu.');
+  return;
+ }
+
+ if(!connected||!tradeWS||tradeWS.readyState!==WebSocket.OPEN){
+  alert('Hubungkan akun dahulu.');
+  return;
+ }
+
+ if(sessionLocked){
+  alert('Sesi terkunci karena batas rugi tercapai.');
+  return;
+ }
+
+ if(!$('symbol').value){
+  alert('Pilih satu instrumen dahulu.');
+  return;
+ }
+
+ if(Number($('stake').value)<=0){
+  alert('Stake tidak valid.');
+  return;
+ }
+
+ if(accountMode==='real'){
+  if(!$('realConfirm').checked){
+   alert('Konfirmasi risiko akun REAL terlebih dahulu.');
+   return;
+  }
+
+  if(!confirm('Aktifkan auto-entry pada akun REAL? Bot dapat menggunakan uang sungguhan dan mengalami kerugian.')){
+   return;
+  }
+ }
+
+ chosenSymbol=$('symbol').value;
+ stopRequested=false;
+ botRunning=true;
+
+ $('botPill').textContent='BOT AKTIF — MENUNGGU DETIK 00';
+ $('startBtn').disabled=true;
+ $('stopBtn').disabled=false;
+
+ log(
+  'AUTO ENTRY '+accountMode.toUpperCase()+' DIAKTIFKAN. '+
+  'Menunggu pergantian candle berikutnya. '+
+  'Instrumen '+chosenSymbol+
+  ' | interval M'+$('timeframe').value+
+  ' | durasi '+$('duration').value+' menit.'
+ );
+
+ scheduleNextCycle();
+}
+
+/* RECONNECT */
+
+function scheduleReconnect(){
+ clearTimeout(reconnectTimer);
+ if(reconnectInProgress)return;
+
+ reconnectTimer=setTimeout(async()=>{
+  if(!botRunning||stopRequested||reconnectInProgress)return;
+
+  reconnectInProgress=true;
+  log('Mencoba reconnect akun '+accountMode.toUpperCase()+'...');
+
+  try{
+   /* Reconnect memerlukan token baru karena token tidak disimpan. */
+   log('Reconnect otomatis akun membutuhkan koneksi ulang manual jika sesi autentikasi berakhir.');
+   stopBot('Koneksi akun terputus. Entry dihentikan untuk keamanan.');
+  }catch(e){
+   log('RECONNECT AKUN GAGAL: '+e.message);
+  }finally{
+   reconnectInProgress=false;
+  }
+
+ },5000);
+}
+
+/* PUTUSKAN KONEKSI */
+
+function disconnect(){
+ stopBot('Koneksi diputus manual.',{closeContracts:false});
+
+ clearInterval(heartbeatTimer);
+ clearTimeout(reconnectTimer);
+ clearTimeout(marketReconnectTimer);
+
+ try{tradeWS?.close()}catch{}
+ try{publicWS?.close()}catch{}
+
+ setConn(false,'Terputus');
+
+ $('connectBtn').disabled=false;
+ $('connectBtn').textContent='HUBUNGKAN AKUN';
+
+ accountId=null;
+ log('Koneksi diputus. Kontrak yang masih berjalan harus diperiksa kembali saat tersambung.');
+}
+
+/* RESET SESI DAN EKSPOR */
+
+async function resetSession(){
+ if(!confirm('Reset statistik sesi dan buka kunci batas rugi? Jurnal historis tidak dihapus.'))return;
+
+ sessionLocked=false;
+ sessionStart=Math.floor(Date.now()/1000);
+
+ await dbPut('meta',{key:'sessionStart',value:sessionStart});
+
+ session={wins:0,losses:0,pnl:0,total:0};
+
+ $('lockNotice').classList.add('hidden');
+ $('startBtn').disabled=!connected||botRunning||buyUnconfirmed;
+
+ log('Statistik sesi direset. Jurnal historis tetap disimpan.');
+ recalc();
+}
+
+function exportCSV(){
+ const arr=[...trades.values()];
+
+ const rows=[
+  ['contract_id','time','symbol','direction','status','profit','stake','score','risk','account_mode','purchase_time','closed_time'],
+  ...arr.map(t=>[
+   t.contract_id,
+   t.time,
+   t.symbol,
+   t.direction,
+   t.status,
+   t.profit,
+   t.stake??'',
+   t.score??'',
+   t.risk??'',
+   t.account_mode??'',
+   t.purchase_time??'',
+   t.closed_time??''
+  ])
+ ];
+
+ const csv=rows.map(r=>
+  r.map(v=>'"'+String(v??'').replace(/"/g,'""')+'"').join(',')
+ ).join('\n');
+
+ const blob=new Blob([csv],{type:'text/csv;charset=utf-8'});
+ const a=document.createElement('a');
+ const url=URL.createObjectURL(blob);
+
+ a.href=url;
+ a.download='deriv-v25-riwayat.csv';
+ a.click();
+
+ setTimeout(()=>URL.revokeObjectURL(url),1000);
+}
+
+/* EVENT LISTENERS */
+
+$('connectBtn').onclick=connectAll;
+$('disconnectBtn').onclick=disconnect;
+$('startBtn').onclick=startBot;
+$('stopBtn').onclick=()=>stopBot('Tombol STOP ditekan.');
+$('checkBtn').onclick=checkSelected;
+$('resetBtn').onclick=resetSession;
+$('exportBtn').onclick=exportCSV;
+
+$('clearViewBtn').onclick=()=>{
+ $('logs').textContent='';
+ /* Tidak menghapus database jurnal. */
+ log('Tampilan log dibersihkan. Riwayat log tersimpan di database.');
+};
+
+$('symbol').onchange=()=>{
+ chosenSymbol=$('symbol').value;
+ lastCycleKey='';
+ log('Instrumen dipilih: '+chosenSymbol+'. Analisis memakai instrumen ini saja.');
+};
+
+$('timeframe').onchange=()=>{
+ lastCycleKey='';
+ log('Interval analisis diubah ke M'+$('timeframe').value);
+
+ if(botRunning&&!stopRequested){
+  log('Jadwal AUTO ENTRY disesuaikan ke interval baru.');
+  scheduleNextCycle();
+ }
+};
+
+restore().catch(e=>log('Gagal memulihkan jurnal: '+e.message));
+setConn(false,'Belum terhubung');
+
+</script>
+</body>
+</html>
