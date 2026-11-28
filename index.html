@@ -1,3 +1,4 @@
+
 <!doctype html>
 <html lang="id">
 <head>
@@ -176,6 +177,9 @@ const API='https://api.derivws.com';
 const PUBLIC_WS='wss://api.derivws.com/trading/v1/options/ws/public';
 
 let publicWS=null,tradeWS=null;
+let marketConnecting=null,marketRetryTimer=null;
+let manualDisconnect=false;
+
 let connected=false,botRunning=false,sessionLocked=false;
 let symbols=[],activeContracts=new Map(),trades=new Map();
 let pending=new Map(),contractSubs=new Set(),requestSeq=100;
@@ -356,6 +360,14 @@ function waitResponse(ws,payload,timeout=12000){
  });
 }
 
+function rejectPendingForSocket(reason){
+ for(const [id,p] of pending){
+  clearTimeout(p.timer);
+  p.reject(Error(reason));
+  pending.delete(id);
+ }
+}
+
 function routeMessage(d){
  if(d.req_id&&pending.has(d.req_id)){
   const p=pending.get(d.req_id);
@@ -390,6 +402,10 @@ async function connectAll(){
   alert('Format App ID tidak sesuai. Periksa kembali di Developer Dashboard.');
   return;
  }
+
+ manualDisconnect=false;
+ clearTimeout(reconnectTimer);
+ reconnectTimer=null;
 
  $('connectBtn').disabled=true;
  $('connectBtn').textContent='MENGHUBUNGKAN...';
@@ -442,26 +458,51 @@ async function connectAll(){
   if(!/\/ws\/demo(?:\?|$)/i.test(url)||/\/ws\/real(?:\?|$)/i.test(url))
    throw Error('Koneksi dibatalkan: URL bukan endpoint DEMO.');
 
+  if(tradeWS){
+   try{tradeWS.close();}catch{}
+   tradeWS=null;
+  }
+
   const ws=new WebSocket(url);
   tradeWS=ws;
 
   await new Promise((resolve,reject)=>{
-   const t=setTimeout(()=>reject(Error('Timeout koneksi akun')),15000);
-   ws.onopen=()=>{clearTimeout(t);resolve();};
-   ws.onerror=()=>{clearTimeout(t);reject(Error('WebSocket akun gagal'));};
+   let settled=false;
+   const t=setTimeout(()=>{
+    if(settled)return;
+    settled=true;
+    reject(Error('Timeout koneksi akun'));
+   },15000);
+
+   ws.onopen=()=>{
+    if(settled)return;
+    settled=true;
+    clearTimeout(t);
+    resolve();
+   };
+
+   ws.onerror=()=>{
+    if(settled)return;
+    settled=true;
+    clearTimeout(t);
+    reject(Error('WebSocket akun gagal'));
+   };
+
+   ws.onclose=()=>{
+    rejectPendingForSocket('Koneksi akun terputus');
+    if(tradeWS===ws)tradeWS=null;
+
+    if(!manualDisconnect){
+     setConn(false,'Koneksi akun terputus');
+     log('Koneksi akun terputus. Entry dihentikan; kontrak terbuka perlu direkonsiliasi setelah sambung ulang.');
+     if(botRunning)scheduleReconnect();
+    }
+   };
   });
 
   ws.onmessage=e=>{
    try{onTradeMessage(JSON.parse(e.data));}
    catch(err){log('Pesan akun error: '+err.message);}
-  };
-
-  ws.onclose=()=>{
-   if(connected){
-    setConn(false,'Koneksi akun terputus');
-    log('Koneksi akun terputus. Entry dihentikan; kontrak terbuka perlu direkonsiliasi setelah sambung ulang.');
-    if(botRunning)scheduleReconnect();
-   }
   };
 
   const b=await waitResponse(ws,{balance:1,subscribe:1});
@@ -471,14 +512,25 @@ async function connectAll(){
   setBalance(bal.balance??demo.balance,accountCurrency);
   $('modePill').textContent='DEMO '+accountCurrency;
 
-  setConn(true,'Akun DEMO terhubung');
+  setConn(true,'Akun DEMO terhubung; menyiapkan data pasar');
   log('Akun DEMO '+accountId+' terhubung. Saldo '+(accountBalance??0).toFixed(2)+' '+accountCurrency+'.');
 
-  await connectPublic();
+  // Kegagalan data pasar tidak memutus koneksi akun.
+  try{
+   await connectPublic();
+  }catch(e){
+   log('DATA PASAR BELUM SIAP: '+e.message);
+   scheduleMarketReconnect();
+  }
+
   await refreshPortfolio();
 
   $('connectBtn').textContent='TERHUBUNG';
   $('connectBtn').disabled=false;
+
+  if(publicWS?.readyState===WebSocket.OPEN){
+   setConn(true,'Akun DEMO dan data pasar terhubung');
+  }
 
  }catch(e){
   $('connectBtn').disabled=false;
@@ -489,32 +541,140 @@ async function connectAll(){
  }
 }
 
+/* KONEKSI DATA PASAR: satu proses koneksi pada satu waktu. */
 async function connectPublic(){
+ if(manualDisconnect)throw Error('Koneksi diputus manual.');
+
  if(publicWS&&publicWS.readyState===WebSocket.OPEN){
-  await loadSymbols();
-  return;
+  if(!symbols.length)await loadSymbols();
+  return true;
  }
 
- const ws=new WebSocket(PUBLIC_WS);
- publicWS=ws;
+ if(marketConnecting)return marketConnecting;
 
- await new Promise((resolve,reject)=>{
-  const t=setTimeout(()=>reject(Error('Timeout data pasar')),15000);
-  ws.onopen=()=>{clearTimeout(t);resolve();};
-  ws.onerror=()=>{clearTimeout(t);reject(Error('Data pasar gagal terhubung'));};
- });
+ marketConnecting=(async()=>{
+  if(publicWS){
+   const old=publicWS;
+   publicWS=null;
+   try{old.close();}catch{}
+  }
 
- ws.onmessage=e=>{
-  let d;
-  try{d=JSON.parse(e.data);}catch{return;}
-  if(routeMessage(d))return;
-  if(d.error)log('DATA PASAR ERROR: '+d.error.message);
- };
+  log('Menghubungkan data pasar...');
 
- await loadSymbols();
+  const ws=new WebSocket(PUBLIC_WS);
+  publicWS=ws;
+
+  await new Promise((resolve,reject)=>{
+   let settled=false;
+
+   const timer=setTimeout(()=>{
+    if(settled)return;
+    settled=true;
+    reject(Error('Timeout koneksi data pasar'));
+   },15000);
+
+   ws.onopen=()=>{
+    if(settled)return;
+    settled=true;
+    clearTimeout(timer);
+    resolve();
+   };
+
+   ws.onerror=()=>{
+    if(settled)return;
+    settled=true;
+    clearTimeout(timer);
+    reject(Error('WebSocket data pasar gagal'));
+   };
+
+   ws.onclose=()=>{
+    if(publicWS===ws)publicWS=null;
+    rejectPendingForSocket('Koneksi data pasar terputus');
+
+    if(!manualDisconnect){
+     log('DATA PASAR TERPUTUS.');
+     if(connected){
+      $('connText').textContent='Akun DEMO terhubung; data pasar menyambungkan ulang';
+      scheduleMarketReconnect();
+     }
+    }
+
+    if(!settled){
+     settled=true;
+     clearTimeout(timer);
+     reject(Error('Koneksi data pasar ditutup sebelum siap'));
+    }
+   };
+  });
+
+  if(publicWS!==ws||ws.readyState!==WebSocket.OPEN)
+   throw Error('Koneksi data pasar tidak stabil.');
+
+  ws.onmessage=e=>{
+   let d;
+   try{d=JSON.parse(e.data);}catch{return;}
+   if(routeMessage(d))return;
+   if(d.error)log('DATA PASAR ERROR: '+d.error.message);
+  };
+
+  await loadSymbols();
+
+  if(!symbols.length)
+   throw Error('Daftar instrumen pasar kosong.');
+
+  if(publicWS!==ws||ws.readyState!==WebSocket.OPEN)
+   throw Error('Koneksi data pasar terputus saat memuat instrumen.');
+
+  log('Koneksi data pasar berhasil. '+symbols.length+' instrumen tersedia.');
+
+  if(connected){
+   setConn(true,'Akun DEMO dan data pasar terhubung');
+  }
+
+  return true;
+ })();
+
+ try{
+  return await marketConnecting;
+ }catch(e){
+  if(publicWS&&publicWS.readyState!==WebSocket.OPEN){
+   const failed=publicWS;
+   publicWS=null;
+   try{failed.close();}catch{}
+  }
+  throw e;
+ }finally{
+  marketConnecting=null;
+ }
+}
+
+function scheduleMarketReconnect(){
+ if(manualDisconnect||!connected||marketRetryTimer)return;
+
+ marketRetryTimer=setTimeout(async()=>{
+  marketRetryTimer=null;
+
+  if(manualDisconnect||!connected)return;
+
+  try{
+   await connectPublic();
+   log('DATA PASAR BERHASIL TERHUBUNG KEMBALI.');
+
+   if(connected&&botRunning){
+    $('connText').textContent='Akun DEMO dan data pasar terhubung';
+    scheduleNext();
+   }
+  }catch(e){
+   log('RECONNECT DATA PASAR GAGAL: '+e.message);
+   scheduleMarketReconnect();
+  }
+ },3000);
 }
 
 async function loadSymbols(){
+ if(!publicWS||publicWS.readyState!==WebSocket.OPEN)
+  throw Error('WebSocket data pasar belum siap.');
+
  const r=await waitResponse(publicWS,{active_symbols:'brief'},15000);
  const list=r.active_symbols||r.data?.active_symbols||[];
 
@@ -539,7 +699,14 @@ async function loadSymbols(){
  if(old&&symbols.some(s=>s.code===old))sel.value=old;
 
  sel.disabled=!symbols.length;
- setConn(connected,'Akun DEMO terhubung');
+
+ if(connected){
+  const marketReady=publicWS?.readyState===WebSocket.OPEN;
+  setConn(true,marketReady?
+   'Akun DEMO dan data pasar terhubung':
+   'Akun DEMO terhubung; data pasar terputus');
+ }
+
  log('Data pasar siap: '+symbols.length+' instrumen. Pilih satu instrumen.');
 }
 
@@ -697,7 +864,7 @@ function stopBot(reason='STOP ditekan.'){
  botRunning=false;
  clearTimeout(scheduler);
  $('botPill').textContent='BOT STOP';
- $('startBtn').disabled=!connected||sessionLocked;
+ $('startBtn').disabled=!connected||sessionLocked||!symbols.length;
  $('stopBtn').disabled=true;
  $('scheduleInfo').textContent='Jadwal entry tidak aktif.';
  log('Entry baru dihentikan: '+reason+' Kontrak terbuka tetap dipantau.');
@@ -790,6 +957,9 @@ function analyze(cs){
 }
 
 async function getCandles(symbol,tf){
+ if(!publicWS||publicWS.readyState!==WebSocket.OPEN)
+  throw Error('Koneksi data pasar terputus.');
+
  const r=await waitResponse(publicWS,{
   ticks_history:symbol,
   count:120,
@@ -854,6 +1024,12 @@ async function checkSelected(){
 
 async function cycle(key){
  if(!botRunning||!connected||cycleBusy||sessionLocked)return;
+
+ if(!publicWS||publicWS.readyState!==WebSocket.OPEN){
+  log('Evaluasi ditunda: data pasar terputus. Menunggu sambung ulang.');
+  scheduleMarketReconnect();
+  return;
+ }
 
  const symbol=$('symbol').value;
  const tf=Number($('timeframe').value);
@@ -979,10 +1155,10 @@ function scheduleNext(){
  },delay);
 }
 
-function startBot(){
- if(!connected||tradeWS?.readyState!==WebSocket.OPEN||
-    publicWS?.readyState!==WebSocket.OPEN){
-  alert('Pastikan akun dan data pasar terhubung.');
+/* START sekarang menunggu data pasar siap, bukan langsung gagal. */
+async function startBot(){
+ if(!connected||!tradeWS||tradeWS.readyState!==WebSocket.OPEN){
+  alert('Koneksi akun DEMO belum siap.');
   return;
  }
 
@@ -990,20 +1166,45 @@ function startBot(){
  if(!$('symbol').value)return alert('Pilih instrumen dahulu.');
  if(Number($('stake').value)<=0)return alert('Stake tidak valid.');
 
- botRunning=true;
- $('botPill').textContent='BOT AKTIF';
  $('startBtn').disabled=true;
- $('stopBtn').disabled=false;
+ $('connText').textContent='Memeriksa koneksi data pasar...';
 
- log('AUTO ENTRY DIMULAI. Menunggu pergantian candle M'+$('timeframe').value+'.');
- scheduleNext();
+ try{
+  if(!publicWS||publicWS.readyState!==WebSocket.OPEN){
+   log('AUTO ENTRY menunggu koneksi data pasar...');
+   await connectPublic();
+  }
+
+  if(!publicWS||publicWS.readyState!==WebSocket.OPEN)
+   throw Error('Data pasar belum siap.');
+
+  if(!symbols.some(s=>s.code===$('symbol').value))
+   throw Error('Instrumen pilihan belum tersedia.');
+
+  botRunning=true;
+
+  $('botPill').textContent='BOT AKTIF';
+  $('startBtn').disabled=true;
+  $('stopBtn').disabled=false;
+  $('connText').textContent='Akun DEMO dan data pasar terhubung';
+
+  log('AUTO ENTRY DIMULAI. Menunggu pergantian candle M'+$('timeframe').value+'.');
+  scheduleNext();
+
+ }catch(e){
+  $('startBtn').disabled=false;
+  $('connText').textContent='Data pasar belum siap';
+  log('AUTO ENTRY DITUNDA: '+e.message);
+  alert('Data pasar belum siap. Bot belum memulai entry. Silakan coba lagi.');
+  if(connected)scheduleMarketReconnect();
+ }
 }
 
 function scheduleReconnect(){
  clearTimeout(reconnectTimer);
 
  reconnectTimer=setTimeout(()=>{
-  if(!botRunning||!tokenInMemory)return;
+  if(manualDisconnect||!botRunning||!tokenInMemory)return;
 
   log('Mencoba sambung ulang akun DEMO...');
   $('token').value=tokenInMemory;
@@ -1014,6 +1215,13 @@ function scheduleReconnect(){
 }
 
 function disconnect(){
+ manualDisconnect=true;
+
+ clearTimeout(marketRetryTimer);
+ marketRetryTimer=null;
+ clearTimeout(reconnectTimer);
+ reconnectTimer=null;
+
  stopBot('Koneksi diputus manual.');
 
  try{
@@ -1021,11 +1229,23 @@ function disconnect(){
   publicWS?.close();
  }catch{}
 
+ tradeWS=null;
+ publicWS=null;
+ symbols=[];
+ contractSubs.clear();
+
  setConn(false,'Terputus');
+
+ $('symbol').innerHTML='<option>Hubungkan data pasar dahulu</option>';
+ $('symbol').disabled=true;
+
  $('connectBtn').disabled=false;
  $('connectBtn').textContent='HUBUNGKAN DEMO';
+
  tokenInMemory='';
  $('token').value='';
+
+ log('Koneksi akun dan data pasar diputus manual.');
 }
 
 async function resetSession(){
@@ -1040,7 +1260,7 @@ async function resetSession(){
 
  $('lockNotice').classList.add('hidden');
  recalc();
- $('startBtn').disabled=!connected;
+ $('startBtn').disabled=!connected||!symbols.length;
 
  log('Sesi direset. Jurnal transaksi tetap disimpan.');
 }
